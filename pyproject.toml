@@ -8,8 +8,15 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.12"
 fastapi = "^0.111.1"
+pandas = "^2.2.2"
+pyodbc = "^5.1.0"
+loguru = "^0.7.2"
+sqlalchemy = "^2.0.31"
 
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+ignore_missing_imports = true

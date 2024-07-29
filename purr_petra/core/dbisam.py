@@ -1,4 +1,4 @@
-"""Convenience method for dealing with SQLAnywhere via ODBC"""
+"""Convenience method for dealing with DBISAM via ODBC"""
 
 import re
 from pathlib import Path
@@ -11,7 +11,6 @@ from purr_petra.core.logger import logger
 #     """Stub Class for Retry"""
 
 
-# SQLANY_DRIVER = "SQL Anywhere 17"
 DBISAM_DRIVER = "DBISAM 4 ODBC Driver"
 
 

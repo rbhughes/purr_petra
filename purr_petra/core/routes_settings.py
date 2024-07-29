@@ -1,7 +1,6 @@
 """FastAPI Routing for Settings and Repo Recon"""
 
 import asyncio
-import json
 import uuid
 from typing import Dict
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,9 +8,9 @@ from sqlalchemy.orm import Session
 import purr_petra.core.schemas as schemas
 import purr_petra.core.crud as crud
 from purr_petra.core.database import get_db
+from purr_petra.core.util import is_valid_dir
 
-# from purr_geographix.core.util import is_valid_dir, hostname
-# from purr_geographix.recon.recon import repo_recon
+from purr_petra.recon.recon import repo_recon
 from purr_petra.core.logger import logger
 
 router = APIRouter()
@@ -19,13 +18,13 @@ router = APIRouter()
 task_storage: Dict[str, schemas.RepoReconResponse] = {}
 
 
-async def process_repo_recon(task_id: str, recon_root: str, ggx_host: str):
+async def process_repo_recon(task_id: str, recon_root: str):
     """Trigger repo_recon and update task_storage"""
     try:
         task_storage[task_id].task_status = schemas.TaskStatus.IN_PROGRESS
-        repos = await repo_recon(recon_root, ggx_host)
-        for r in repos:
-            logger.info(json.dumps(r, indent=4))
+        repos = await repo_recon(recon_root)
+        # for r in repos:
+        #     logger.info(json.dumps(r, indent=4))
 
         task_storage[task_id].task_status = schemas.TaskStatus.COMPLETED
     except Exception as e:  # pylint: disable=broad-except
@@ -124,18 +123,18 @@ def get_repo_by_id(repo_id: str, db: Session = Depends(get_db)):
 @router.post(
     "/repos/recon",
     response_model=schemas.RepoReconResponse,
-    summary="Scan network path for GeoGraphix projects.",
+    summary="Scan network path for Petra projects.",
     description=(
-        "Supply a top-level 'recon_root' path (or Project Home) to scan for"
-        "projects (a.k.a. repos). Metadata will be collected for valid repos "
-        "and stored in a local database. Collect asset data from these 'known' "
-        "repos later. The task_id is returned immediately; use GET with "
-        "task_id to get task status."
+        "Supply a top-level 'recon_root' path to scan for projects (a.k.a. "
+        "Repos). Metadata will be collected for valid repos and stored in a "
+        "local database. You can collect asset data from these 'known' repos "
+        "later. "
+        "The task_id is returned immediately; use it to check task status."
     ),
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def run_repo_recon(recon_root: str, ggx_host: str = hostname()):
-    """Scan network path for GeoGraphix projects"""
+async def run_repo_recon(recon_root: str):
+    """Scan network path for Petra projects"""
     valid_recon_root = is_valid_dir(recon_root)
     if not valid_recon_root:
         raise HTTPException(
@@ -146,14 +145,13 @@ async def run_repo_recon(recon_root: str, ggx_host: str = hostname()):
     new_repo_recon = schemas.RepoReconResponse(
         id=task_id,
         recon_root=valid_recon_root,
-        ggx_host=ggx_host,
         task_status=schemas.TaskStatus.PENDING,
     )
     task_storage[task_id] = new_repo_recon
 
     # do not await create_task, or it will block the 202 response
     # noinspection PyAsyncCall
-    asyncio.create_task(process_repo_recon(task_id, valid_recon_root, ggx_host))
+    asyncio.create_task(process_repo_recon(task_id, valid_recon_root))
     return new_repo_recon
 
 

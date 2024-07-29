@@ -22,7 +22,7 @@ class Repo(Base):
     name = Column(String)
     fs_path = Column(String)
     conn = Column(JSON)
-    conn_aux = Column(JSON)
+    # conn_aux = Column(JSON)
     suite = Column(String)
     well_count = Column(Integer)
     wells_with_completion = Column(Integer)

@@ -7,10 +7,6 @@ import pyodbc
 from purr_petra.core.logger import logger
 
 
-# class RetryException(Exception):
-#     """Stub Class for Retry"""
-
-
 DBISAM_DRIVER = "DBISAM 4 ODBC Driver"
 
 
@@ -45,20 +41,14 @@ def db_exec(conn: dict, sql: str) -> List[Dict[str, Any]] | Exception:
                     for row in cursor.fetchall()
                 ]
 
-    # except pyodbc.OperationalError as oe:
-    #     logger.error({"error": oe, "context": conn})
-    #     if re.search(r"Database name not unique", str(oe)):
-    #         conn.pop("dbf")
-    #         raise RetryException from oe
-    #     else:
-    #         return oe
     except pyodbc.ProgrammingError as pe:
         logger.error({"error": pe, "context": conn})
         if re.search(r"Table .* not found", str(pe)):
             return pe
-    except Exception as ex:
-        logger.error({"error": ex, "context": conn})
-        raise ex
+    except pyodbc.Error as e:
+        logger.error({"error": e, "context": conn})
+        # if "DBISAM Engine Error # 11013" in str(e):
+        #     logger.error(f"Access denied to temp table or file: {e}")
 
 
 def make_conn_params(repo_path: str) -> dict:

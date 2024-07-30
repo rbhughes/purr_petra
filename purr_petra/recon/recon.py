@@ -11,6 +11,7 @@ from purr_petra.core.util import generate_repo_id, async_wrap
 
 # from purr_geographix.recon.epsg import epsg_codes
 # from purr_petra.recon.repo_db import well_counts, get_polygon, check_gxdb
+from purr_petra.recon.repo_db import well_counts, get_polygon
 from purr_petra.recon.repo_db import check_dbisam
 from purr_petra.recon.repo_fs import network_repo_scan
 from purr_petra.core.schemas import Repo
@@ -33,6 +34,7 @@ async def repo_recon(recon_root: str) -> List[Dict[str, Any]]:
         List[dict]: List of repo dicts containing metadata
     """
     repo_paths = await network_repo_scan(recon_root)
+
     repo_list = [create_repo_base(rp) for rp in repo_paths]
 
     # make another pass to verify gxdb (now that we have a conn)
@@ -40,11 +42,12 @@ async def repo_recon(recon_root: str) -> List[Dict[str, Any]]:
 
     # augment_funcs = [well_counts, get_polygon, epsg_codes, dir_stats, repo_mod]
 
-    augment_funcs = []
+    augment_funcs = [well_counts, get_polygon]
 
     async def update_repo(repo_base):
         for func in augment_funcs:
-            repo_base.update(await async_wrap(func)(repo_base))
+            # repo_base.update(await async_wrap(func)(repo_base))
+            repo_base.update(func(repo_base))
         return repo_base
 
     repos = await asyncio.gather(*[update_repo(repo) for repo in repo_list])
@@ -55,14 +58,14 @@ async def repo_recon(recon_root: str) -> List[Dict[str, Any]]:
     upsert_repos(db, valid_repo_dicts)
     db.close()
 
-    for r in valid_repo_dicts:
-        r["repo_mod"] = r["repo_mod"].strftime("%Y-%m-%d %H:%M:%S")
+    # for r in valid_repo_dicts:
+    #     r["repo_mod"] = r["repo_mod"].strftime("%Y-%m-%d %H:%M:%S")
 
-    print("RRRRRRRRRRRRRRRRRR")
-    for r in valid_repo_dicts:
-        print(r)
-        print("-------------")
-    print("RRRRRRRRRRRRRRRRRR")
+    # print("RRRRRRRRRRRRRRRRRR")
+    # for r in repos:
+    #     print(r)
+    #     print("-------------")
+    # print("RRRRRRRRRRRRRRRRRR")
 
     return valid_repo_dicts
 

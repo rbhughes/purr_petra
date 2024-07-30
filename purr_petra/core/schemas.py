@@ -47,18 +47,18 @@ class RepoBase(BaseModel):
     conn: Dict[str, Any]
     ### conn_aux: Dict[str, Any] | None
     suite: str
-    # well_count: int | None
+    well_count: int | None
     # wells_with_completion: int | None
-    # wells_with_core: int | None
-    # wells_with_dst: int | None
-    # wells_with_formation: int | None
-    # wells_with_ip: int | None
-    # wells_with_perforation: int | None
-    # wells_with_production: int | None
-    # wells_with_raster_log: int | None
-    # wells_with_survey: int | None
-    # wells_with_vector_log: int | None
-    # wells_with_zone: int | None
+    wells_with_core: int | None
+    wells_with_dst: int | None
+    wells_with_formation: int | None
+    wells_with_ip: int | None
+    wells_with_perforation: int | None
+    wells_with_production: int | None
+    wells_with_raster_log: int | None
+    wells_with_survey: int | None
+    wells_with_vector_log: int | None
+    wells_with_zone: int | None
     # storage_epsg: int
     # storage_name: str
     # display_epsg: int

@@ -65,10 +65,13 @@ def generate_repo_id(fs_path: str) -> str:
         fs_path (str): Full path to a repo (project) directory.
 
     Returns:
-        str: Short, unique id that is easier for humans to work with than UUID
+        str: Short, unique id that is easier for humans to work with than UUID.
+        Pad with "_" if resulting name length is fewer than 3 chars.
     """
     fp = Path(fs_path)
     prefix = fp.name.upper()[:3]
+    if len(fp.name) < 3:
+        prefix = prefix.ljust(3, "_")
     suffix = hashlib.md5(str(fp).lower().encode()).hexdigest()[:6]
     return f"{prefix}_{suffix}".upper()
 

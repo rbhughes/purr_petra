@@ -126,10 +126,13 @@ def dir_stats(repo_base) -> dict:
 def repo_mod(repo_base) -> dict:
     """Walk the project directory to get the latest file modification date.
 
-    We exclude SQLAnywhere files since they are modified simply by making
-    an ODBC connection.
-
-    TODO: Needs serious optimization, maybe multi-thread like os.walk?
+    TODO: optimize? Maybe PowerShell (if sufficient permissions):
+    def get_latest_mod_date_powershell(directory):
+    command = f'powershell -Command "Get-ChildItem -Path \'{directory}\'
+        -Recurse | Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1 | Select-Object -ExpandProperty LastWriteTime"'
+    result = subprocess.run(command, capture_output=True, text=True)
+    return datetime.strptime(result.stdout.strip(), "%m/%d/%Y %I:%M:%S %p")
 
     Args:
         repo_base (dict): A stub repo dict. We just use the fs_path
@@ -140,18 +143,16 @@ def repo_mod(repo_base) -> dict:
     logger.info(f"repo_mod: {repo_base['fs_path']}")
 
     last_mod = datetime(1970, 1, 1)
-    gxdb_matcher = re.compile(r"gxdb\.db$|gxdb_production\.db$|gxdb\.log$")
 
     for root, _, files in os.walk(repo_base["fs_path"]):
         for file in files:
-            if not gxdb_matcher.match(file):
-                full_path = os.path.join(root, file)
-                try:
-                    stat = os.stat(full_path)
-                    mod_time = datetime.fromtimestamp(stat.st_mtime)
-                    if mod_time > last_mod:
-                        last_mod = mod_time
-                except (OSError, ValueError):
-                    continue
+            full_path = os.path.join(root, file)
+            try:
+                stat = os.stat(full_path)
+                mod_time = datetime.fromtimestamp(stat.st_mtime)
+                if mod_time > last_mod:
+                    last_mod = mod_time
+            except (OSError, ValueError):
+                continue
 
     return {"repo_mod": last_mod.strftime("%Y-%m-%d %H:%M:%S")}

@@ -1,6 +1,7 @@
 """Stuff involving metadata within Repo databases"""
 
 from typing import Dict, List, Optional, Tuple
+from shapely.geometry import Polygon, MultiPolygon
 import numpy as np
 import alphashape  # mypy: ignore-missing-imports
 from purr_petra.core.dbisam import db_exec
@@ -204,13 +205,21 @@ def concave_hull(points, alpha=0.5) -> Optional[List[Tuple[float, float]]]:
     if alpha_shape.is_empty:
         return None
     else:
-        print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-        print(alpha_shape)
-        print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-
-        return [
-            (float(coord[0]), float(coord[1])) for coord in alpha_shape.exterior.coords
-        ]
+        if isinstance(alpha_shape, Polygon):
+            return [
+                (float(coord[0]), float(coord[1]))
+                for coord in alpha_shape.exterior.coords
+            ]
+        elif isinstance(alpha_shape, MultiPolygon):
+            # exterior of the largest polygon in MultiPolygon
+            largest_polygon = max(alpha_shape.geoms, key=lambda p: p.area)
+            return [
+                (float(coord[0]), float(coord[1]))
+                for coord in largest_polygon.exterior.coords
+            ]
+        else:
+            logger.warning(f"Unexpected geometry type: {type(alpha_shape)}")
+            return None
 
 
 def get_polygon(repo_base) -> Dict[str, Optional[List[Tuple[float, float]]]]:
@@ -246,7 +255,7 @@ def get_polygon(repo_base) -> Dict[str, Optional[List[Tuple[float, float]]]]:
         logger.warning(
             {
                 "context": repo_base["fs_path"],
-                "error": f"Too few valid Lon/Lat for hull: {repo_base["name"]}",
+                "message": f"Too few valid Lon/Lat for hull: {repo_base["name"]}",
             }
         )
         return {"polygon": None}

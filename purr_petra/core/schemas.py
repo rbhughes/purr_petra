@@ -59,15 +59,15 @@ class RepoBase(BaseModel):
     wells_with_survey: int | None
     wells_with_vector_log: int | None
     wells_with_zone: int | None
-    # storage_epsg: int
-    # storage_name: str
-    # display_epsg: int
-    # display_name: str
-    # files: int
-    # directories: int
-    # bytes: int
-    # repo_mod: datetime
-    # polygon: List[Tuple[float, float]] | None
+    storage_epsg: int
+    storage_name: str
+    display_epsg: int
+    display_name: str
+    files: int
+    directories: int
+    bytes: int
+    repo_mod: datetime
+    polygon: List[Tuple[float, float]] | None
 
 
 class Repo(RepoBase):

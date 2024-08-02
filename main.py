@@ -3,10 +3,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import uvicorn
-
 from purr_petra.core import routes_settings
-
-# from purr_geographix.assets.collect import routes_assets
+from purr_petra.assets.collect import routes_assets
 from purr_petra.core.crud import init_file_depot
 from purr_petra.core.database import get_db
 from purr_petra.core.logger import logger
@@ -27,7 +25,7 @@ async def lifespan(fastapp: FastAPI):  # pylint: disable=unused-argument
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(routes_settings.router, prefix="/purr/petra")
-# app.include_router(routes_assets.router, prefix="/purr/ggx")
+app.include_router(routes_assets.router, prefix="/purr/petra")
 
 # to generate current openapi schema
 # import json

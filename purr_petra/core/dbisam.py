@@ -13,6 +13,10 @@ DBISAM_DRIVER = "DBISAM 4 ODBC Driver"
 def db_exec(conn: dict, sql: str) -> List[Dict[str, Any]] | Exception:
     """Convenience method for using pyodbc and DBISAM with Petra
 
+    The dreaded "DBISAM Engine Error # 11013. Access denied to table or file"
+    error might happen with malware scans or slow networks or bad luck, but
+    removing asyncio seems to have mitigated most occurrences.
+
     Args:
         conn (dict): DBISAM connection parameters.
         sql (str): A single SQL statement to execute on the database.
@@ -22,7 +26,7 @@ def db_exec(conn: dict, sql: str) -> List[Dict[str, Any]] | Exception:
 
     Raises:
         - pyodbc.ProgrammingError: For cases where table(s) might not exist due
-        to an unxepected/ancient schema. Schema's >~ 2015 should work.
+        to an unxepected schema.
     """
 
     try:
@@ -42,13 +46,12 @@ def db_exec(conn: dict, sql: str) -> List[Dict[str, Any]] | Exception:
                 ]
 
     except pyodbc.ProgrammingError as pe:
-        logger.error({"error": pe, "context": conn})
+        logger.error(f"{pe}, context: {conn}")
         if re.search(r"Table .* not found", str(pe)):
             return pe
-    except pyodbc.Error as e:
-        logger.error({"error": e, "context": conn})
-        # if "DBISAM Engine Error # 11013" in str(e):
-        #     logger.error(f"Access denied to temp table or file: {e}")
+    except Exception as ex:
+        logger.error(f"{ex}, context: {conn}")
+        raise ex
 
 
 def make_conn_params(repo_path: str) -> dict:
@@ -60,6 +63,5 @@ def make_conn_params(repo_path: str) -> dict:
     Returns:
         dict: dictionary of DBISAM connection parameters.
     """
-
     params = {"driver": DBISAM_DRIVER, "catalogname": str(Path(repo_path) / "DB")}
     return params

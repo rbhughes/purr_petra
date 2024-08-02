@@ -1,6 +1,7 @@
 """FastAPI Routing for Settings and Repo Recon"""
 
 import asyncio
+import json
 import uuid
 from typing import Dict
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,8 +24,8 @@ async def process_repo_recon(task_id: str, recon_root: str):
     try:
         task_storage[task_id].task_status = schemas.TaskStatus.IN_PROGRESS
         repos = await repo_recon(recon_root)
-        # for r in repos:
-        #     logger.info(json.dumps(r, indent=4))
+        for r in repos:
+            logger.info(json.dumps(r, indent=4))
 
         task_storage[task_id].task_status = schemas.TaskStatus.COMPLETED
     except Exception as e:  # pylint: disable=broad-except

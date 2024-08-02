@@ -5,15 +5,10 @@ from pathlib import Path
 from typing import Dict, List, Any
 from purr_petra.core.crud import upsert_repos
 from purr_petra.core.database import get_db
-
 from purr_petra.core.dbisam import make_conn_params
-from purr_petra.core.util import generate_repo_id, async_wrap
-
+from purr_petra.core.util import generate_repo_id
 from purr_petra.recon.epsg import epsg_codes
-
-# from purr_petra.recon.repo_db import well_counts, get_polygon, check_gxdb
-from purr_petra.recon.repo_db import well_counts, get_polygon
-from purr_petra.recon.repo_db import check_dbisam
+from purr_petra.recon.repo_db import well_counts, get_polygon, check_dbisam
 from purr_petra.recon.repo_fs import network_repo_scan, dir_stats, repo_mod
 from purr_petra.core.schemas import Repo
 
@@ -35,15 +30,19 @@ async def repo_recon(recon_root: str) -> List[Dict[str, Any]]:
         List[dict]: List of repo dicts containing metadata
     """
     repo_paths = await network_repo_scan(recon_root)
-
     repo_list = [create_repo_base(rp) for rp in repo_paths]
 
-    # make another pass to verify db (now that we have a conn)
+    # make another pass to verify db
     repo_list = [repo_base for repo_base in repo_list if check_dbisam(repo_base)]
 
     augment_funcs = [well_counts, get_polygon, epsg_codes, dir_stats, repo_mod]
 
     async def update_repo(repo_base):
+        """Could not use memory tables in SQL if using async_wrap without
+        getting DBISAM Engine Error # 11013. I think it's because DBISAM lets
+        Windows deal with file locking so connection/cursor closing in pyodbc
+        wasn't happening in the thread context.
+        """
         for func in augment_funcs:
             # repo_base.update(await async_wrap(func)(repo_base))
             repo_base.update(func(repo_base))
@@ -59,12 +58,6 @@ async def repo_recon(recon_root: str) -> List[Dict[str, Any]]:
 
     for r in valid_repo_dicts:
         r["repo_mod"] = r["repo_mod"].strftime("%Y-%m-%d %H:%M:%S")
-
-    # print("RRRRRRRRRRRRRRRRRR")
-    # for r in repos:
-    #     print(r)
-    #     print("-------------")
-    # print("RRRRRRRRRRRRRRRRRR")
 
     return valid_repo_dicts
 

@@ -1,5 +1,11 @@
+purr_where = "__pUrRwHeRe__"
+
+identifier_keys = ["w.wsn"]
+id_form = " || '-' || ".join([f"CAST({i} AS VARCHAR(10))" for i in identifier_keys])
+
+
 WELL = {
-    "select": """
+    "selector": f"""
     SELECT
     w.wsn          AS w_wsn,
     w.flags        AS w_flags,
@@ -107,8 +113,70 @@ WELL = {
     LEFT OUTER JOIN zdata z_19 ON w.wsn = z_19.wsn AND z_19.fid = 19
     LEFT OUTER JOIN zflddef f ON f.zid = 2 AND f.fid = w.elev_zid
     LEFT OUTER JOIN zdata z_20 ON w.wsn = z_20.wsn AND z_20.fid = w.elev_fid
-    __pUrRwHeRe__
-    """
+    {purr_where}
+    """,
+    "identifier": f"""
+    SELECT
+      LIST({id_form}) as keylist
+    FROM well w
+    LEFT JOIN locat s ON s.wsn = w.wsn
+    LEFT JOIN bhloc b ON b.wsn = w.wsn
+    LEFT JOIN uwi u ON u.wsn = w.wsn
+    LEFT OUTER JOIN zdata z_1 ON w.wsn = z_1.wsn AND z_1.fid = 1
+    LEFT OUTER JOIN zdata z_2 ON w.wsn = z_2.wsn AND z_2.fid = 2
+    LEFT OUTER JOIN zdata z_3 ON w.wsn = z_3.wsn AND z_3.fid = 3
+    LEFT OUTER JOIN zdata z_4 ON w.wsn = z_4.wsn AND z_4.fid = 4
+    LEFT OUTER JOIN zdata z_5 ON w.wsn = z_5.wsn AND z_5.fid = 5
+    LEFT OUTER JOIN zdata z_6 ON w.wsn = z_6.wsn AND z_6.fid = 6
+    LEFT OUTER JOIN zdata z_7 ON w.wsn = z_7.wsn AND z_7.fid = 7
+    LEFT OUTER JOIN zdata z_8 ON w.wsn = z_8.wsn AND z_8.fid = 8
+    LEFT OUTER JOIN zdata z_9 ON w.wsn = z_9.wsn AND z_9.fid = 9
+    LEFT OUTER JOIN zdata z_10 ON w.wsn = z_10.wsn AND z_10.fid = 10
+    LEFT OUTER JOIN zdata z_11 ON w.wsn = z_11.wsn AND z_11.fid = 11
+    LEFT OUTER JOIN zdata z_12 ON w.wsn = z_12.wsn AND z_12.fid = 12
+    LEFT OUTER JOIN zdata z_13 ON w.wsn = z_13.wsn AND z_13.fid = 13
+    LEFT OUTER JOIN zdata z_14 ON w.wsn = z_14.wsn AND z_14.fid = 14
+    LEFT OUTER JOIN zdata z_15 ON w.wsn = z_15.wsn AND z_15.fid = 15
+    LEFT OUTER JOIN zdata z_16 ON w.wsn = z_16.wsn AND z_16.fid = 16
+    LEFT OUTER JOIN zdata z_17 ON w.wsn = z_17.wsn AND z_17.fid = 17
+    LEFT OUTER JOIN zdata z_18 ON w.wsn = z_18.wsn AND z_18.fid = 18
+    LEFT OUTER JOIN zdata z_19 ON w.wsn = z_19.wsn AND z_19.fid = 19
+    LEFT OUTER JOIN zflddef f ON f.zid = 2 AND f.fid = w.elev_zid
+    LEFT OUTER JOIN zdata adv ON w.wsn = adv.wsn AND adv.fid = w.elev_fid
+    {purr_where}
+    """,
+    "prefixes": {
+        "w_": "well",
+        "s_": "locat",
+        "b_": "bhloc",
+        "z_": "zdata",
+        "u_": "uwi",
+        "f_": "zflddef",
+    },
+    "identifier_keys": identifier_keys,
+    "purr_where": purr_where,
+    "xforms": {
+        "w_adddate": "excel_date",
+        "w_chgdate": "excel_date",
+        "w_remarks": "memo_to_string",
+        "s_congress": "parse_congressional",
+        "s_congress_orig": "blob_to_hex",
+        "s_texasloc": "blob_to_hex",
+        "s_offshore": "blob_to_hex",
+        "b_congress": "parse_congressional",
+        "b_congress_orig": "blob_to_hex",
+        "b_texasloc": "blob_to_hex",
+        "b_offshore": "blob_to_hex",
+        "z_comp_date": "excel_date",
+        "z_spud_date": "excel_date",
+        "z_permit_date": "excel_date",
+        "z_rig_date": "excel_date",
+        "z_aband_date": "excel_date",
+        "z_report_date": "excel_date",
+        "z_wrs_date": "excel_date",
+        "z_last_act_date": "excel_date",
+        "z_platform": "memo_to_string",
+    },
 }
 recipes = {
     "well": WELL,

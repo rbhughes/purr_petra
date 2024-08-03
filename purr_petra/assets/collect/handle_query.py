@@ -45,7 +45,79 @@ formatters = {
 }
 
 
-def add_where_clause(uwi_list: List[str], select: str):
+def chunk_ids(ids, chunk):
+    """
+    [621, 826, 831, 834, 835, 838, 846, 847, 848]
+    ...with chunk=4...
+    [[621, 826, 831, 834], [835, 838, 846, 847], [848]]
+
+    ["1-62", "1-82", "2-83", "2-83", "2-83", "2-83", "2-84", "3-84", "4-84"]
+    ...with chunk=4...
+    [
+        ['1-62', '1-82'],
+        ['2-83', '2-83', '2-83', '2-83', '2-84'],
+        ['3-84', '4-84']
+    ]
+    Note how the group of 2's is kept together, even if it exceeds chunk=4
+
+    :param ids: This is usually a list of wsn ints: [11, 22, 33, 44] but may
+        also be "compound" str : ['1-11', '1-22', '1-33', '2-22', '2-44'].
+    :param chunk: The preferred batch size to process in a single query
+    :return: List of id lists
+    """
+    id_groups = {}
+
+    for item in ids:
+        left = str(item).split("-")[0]
+        if left not in id_groups:
+            id_groups[left] = []
+        id_groups[left].append(item)
+
+    result = []
+    current_subarray = []
+
+    for group in id_groups.values():
+        if len(current_subarray) + len(group) <= chunk:
+            current_subarray.extend(group)
+        else:
+            result.append(current_subarray)
+            current_subarray = group[:]
+
+    if current_subarray:
+        result.append(current_subarray)
+
+    return result
+
+
+def fetch_id_list(conn, id_sql):
+    """
+    :return: Results will be either be a single "keylist"
+    [{keylist: ["1-62", "1-82", "2-83", "2-84"]}]
+    or a list of key ids
+    [{key: "1-62"}, {key: "1-82"}, {key: "2-83"}, {key: "2-84"}]
+    Force int() or str(); the typical case is a list of int
+    """
+
+    def int_or_string(obj):
+        try:
+            return int(obj)
+        except ValueError:
+            return f"'{str(obj).strip()}'"
+
+    res = db_exec(conn, id_sql)
+
+    ids = []
+    if "keylist" in res[0]:
+        ids = res[0]["keylist"].split(",")
+    elif "key" in res[0]:
+        ids = [x["key"] for x in res]
+    else:
+        print("key or keylist missing; cannot make id list")
+
+    return [int_or_string(i) for i in ids]
+
+
+def make_where_clause(uwi_list: List[str]):
     """Construct the UWI-centric part of a WHERE clause containing UWIs. The
     WHERE clause will start: "WHERE 1=1 " to which we append:
     "AND u_uwi LIKE '0123%' OR u_uwi LIKE '4567'"
@@ -55,39 +127,101 @@ def add_where_clause(uwi_list: List[str], select: str):
     Args:
         uwi_list (List[str]): List of UWI strings with optional wildcard chars
     """
-
+    # ASSUMES u.uwi WILL ALWAYS BE THE UWI FILTER
     col = "u.uwi"
     clause = "WHERE 1=1"
     if uwi_list:
         uwis = [f"{col} LIKE '{uwi}'" for uwi in uwi_list]
         clause += " AND " + " OR ".join(uwis)
 
-    query = select.replace("__pUrRwHeRe__", clause)
-    return query
+    return clause
 
 
+def make_id_in_clauses(identifier_keys, ids):
+    clause = "WHERE 1=1 "
+    if len(identifier_keys) == 1 and str(ids[0]).replace("'", "").isdigit():
+        no_quotes = ",".join(str(i).replace("'", "") for i in ids)
+        clause += f"AND {identifier_keys[0]} IN ({no_quotes})"
+    else:
+        idc = " || '-' || ".join(f"CAST({i} AS VARCHAR(10))" for i in identifier_keys)
+        clause += f"AND {idc} IN ({','.join(ids)})"
+    return clause
+
+
+#######################################################################
+#######################################################################
+
+formatters = {
+    "int": safe_numeric,
+    "excel_date": lambda x: print(f"you called excel_date with {x}"),
+}
+
+
+#######################################################################
 # def collect_and_assemble_docs(args: Dict[str, Any]) -> List[Dict[str, Any]]:
 def collect_and_assemble_docs(args: Dict[str, Any]):
-    """Execute SQL queries and combine results into JSON documents
-
-    Args:
-        args (Dict[str, Any]: Contains connection params, a UWI filter and a
-        specific 'recipe' for how to query and merge the results into JSON
-
-    Returns:
-        List[Dict[str, Any]]: A list of well-centric documents
-    """
-
-    print("############################")
-    print(args.keys())
-    print(args["uwi_list"])
-    print("############################")
-
     conn = args["conn"]
-
     recipe = args["recipe"]
 
-    select = add_where_clause(uwi_list=args["uwi_list"], select=recipe["select"])
+    where = make_where_clause(args["uwi_list"])
+
+    id_sql = recipe["identifier"].replace(recipe["purr_where"], where)
+    ids = fetch_id_list(conn, id_sql)
+    chunked_ids = chunk_ids(ids, 4)
+
+    selectors = []
+    for c in chunked_ids:
+        in_clause = make_id_in_clauses(recipe["identifier_keys"], c)
+        select_sql = recipe["selector"].replace(recipe["purr_where"], in_clause)
+        selectors.append(select_sql)
+
+    xforms = recipe["xforms"]
+
+    for q in selectors:
+        # pylint: disable=c-extension-no-member
+        with pyodbc.connect(**conn) as cn:
+            cursor = cn.cursor()
+            cursor.execute(q)
+
+            col_mappings = [
+                (column[0], column[1].__name__) for column in cursor.description
+            ]
+
+            # for col_name, col_type in columns:
+            #     print(f"instance Column Name: {col_name}, Data Type: {col_type}")
+
+            for row in cursor.fetchall():
+                o = {}
+                for i, cell in enumerate(row):
+                    key = col_mappings[i][0]
+                    dt = col_mappings[i][1]
+
+                    # print(key, dt)
+                    # if dt == "int":
+                    #     print("int", cell)
+
+                    xform = xforms.get(key, dt)
+                    # print(key, "<====>", xform)
+                    fr = formatters.get(xform, lambda x: x)(cell)
+                    print("------------>", fr)
+
+                    o[key] = cell
+
+                    # print("i", i)
+                    # print("cell", cell)
+                    # print("mappings[i]", col_mappings[i])
+                    # print("----------", col_mappings[i][0])
+                # print(o)
+                print("--------------------------------")
+
+    ########################################################
+
+    # selector = add_where_clause(uwi_list=args["uwi_list"], sql=recipe["select"])
+    # identifier = add_where_clause(uwi_list=args["uwi_list"], sql=recipe["identify"])
+
+    # print("############################")
+    # print(ids)
+    # print("############################")
 
     # x = db_exec(conn=conn, sql="select * from well")
 
@@ -105,12 +239,12 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
     # get_column_mappings()
 
-    with pyodbc.connect(**conn) as cn:
-        cursor = cn.cursor()
-        cursor.execute(select)
+    # with pyodbc.connect(**conn) as cn:
+    #     cursor = cn.cursor()
+    #     cursor.execute(identifier)
 
-        for col in cursor.columns():
-            print(col)
+    #     for col in cursor.columns():
+    #         print(col)
 
 
 def export_json(records, export_file) -> str:

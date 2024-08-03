@@ -140,9 +140,6 @@ async def asset_collection(
     asset = asset.value
 
     uwi_list = parse_uwis(uwi_query)
-    print("$$$$$$$$$$$$$$$$$$$$$$")
-    print(uwi_list)
-    print("$$$$$$$$$$$$$$$$$$$$$$")
 
     task_id = str(uuid.uuid4())
 

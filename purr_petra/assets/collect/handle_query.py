@@ -15,9 +15,13 @@ me if you want more details.
 """
 
 import json
+import re
+import struct
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Generator
+from typing import Any, Dict, Optional, List, Generator
 import pyodbc
+import warnings
 
 from purr_petra.core.dbisam import db_exec
 
@@ -28,21 +32,24 @@ from purr_petra.assets.collect.select_recipes import recipes
 from purr_petra.core.util import (
     async_wrap,
     datetime_formatter,
-    safe_numeric,
     CustomJSONEncoder,
 )
+from purr_petra.assets.collect.xformer import formatters
 from purr_petra.core.logger import logger
 
 
-formatters = {
-    "date": datetime_formatter(),
-    "float": safe_numeric,
-    "int": safe_numeric,
-    "hex": lambda x: (
-        x.hex() if isinstance(x, bytes) else (None if pd.isna(x) else str(x))
-    ),
-    "str": lambda x: str(x) if pd.notna(x) else "",
-}
+warnings.filterwarnings(
+    "ignore", message="pandas only supports SQLAlchemy connectable.*"
+)
+# formatters = {
+#     "date": datetime_formatter(),
+#     "float": safe_numeric,
+#     "int": safe_numeric,
+#     "hex": lambda x: (
+#         x.hex() if isinstance(x, bytes) else (None if pd.isna(x) else str(x))
+#     ),
+#     "str": lambda x: str(x) if pd.notna(x) else "",
+# }
 
 
 def chunk_ids(ids, chunk):
@@ -149,27 +156,24 @@ def make_id_in_clauses(identifier_keys, ids):
 
 
 #######################################################################
-#######################################################################
 
-formatters = {
-    "int": safe_numeric,
-    "excel_date": lambda x: print(f"you called excel_date with {x}"),
-}
+#######################################################################
 
 
 #######################################################################
 # def collect_and_assemble_docs(args: Dict[str, Any]) -> List[Dict[str, Any]]:
 def collect_and_assemble_docs(args: Dict[str, Any]):
-    conn = args["conn"]
+    conn_params = args["conn"]
     recipe = args["recipe"]
 
     where = make_where_clause(args["uwi_list"])
 
     id_sql = recipe["identifier"].replace(recipe["purr_where"], where)
-    ids = fetch_id_list(conn, id_sql)
+    ids = fetch_id_list(conn_params, id_sql)
     chunked_ids = chunk_ids(ids, 4)
 
     selectors = []
+
     for c in chunked_ids:
         in_clause = make_id_in_clauses(recipe["identifier_keys"], c)
         select_sql = recipe["selector"].replace(recipe["purr_where"], in_clause)
@@ -177,42 +181,65 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
     xforms = recipe["xforms"]
 
+    ############
+    all_data = []
+    all_columns = set()
+
+    # Collect all data and column names
     for q in selectors:
         # pylint: disable=c-extension-no-member
-        with pyodbc.connect(**conn) as cn:
-            cursor = cn.cursor()
-            cursor.execute(q)
+        with pyodbc.connect(**conn_params) as conn:
+            df = pd.read_sql(q, conn)
+            if not df.empty:
+                all_data.extend(df.to_dict("records"))
+                all_columns.update(df.columns)
 
-            col_mappings = [
-                (column[0], column[1].__name__) for column in cursor.description
-            ]
+    if not all_data:
+        print("No data found.")
+        return pd.DataFrame(columns=list(all_columns))
 
-            # for col_name, col_type in columns:
-            #     print(f"instance Column Name: {col_name}, Data Type: {col_type}")
+    # Create a single DataFrame with all collected data
+    full_df = pd.DataFrame(all_data, columns=list(all_columns))
 
-            for row in cursor.fetchall():
-                o = {}
-                for i, cell in enumerate(row):
-                    key = col_mappings[i][0]
-                    dt = col_mappings[i][1]
+    # Apply transformations
+    for col in full_df.columns:
+        xform = xforms.get(col, full_df[col].dtype.name)
+        full_df[col] = full_df[col].apply(formatters.get(xform, lambda x: x))
 
-                    # print(key, dt)
-                    # if dt == "int":
-                    #     print("int", cell)
+    # Replace NaN with None for consistency
+    full_df = full_df.where(pd.notnull(full_df), None)
 
-                    xform = xforms.get(key, dt)
-                    # print(key, "<====>", xform)
-                    fr = formatters.get(xform, lambda x: x)(cell)
-                    print("------------>", fr)
+    # print(full_df.w_uwi, full_df.z_comp_date, full_df.z_last_act_date)
+    print(full_df.s_congress)
 
-                    o[key] = cell
+    return full_df
 
-                    # print("i", i)
-                    # print("cell", cell)
-                    # print("mappings[i]", col_mappings[i])
-                    # print("----------", col_mappings[i][0])
-                # print(o)
-                print("--------------------------------")
+    ############
+
+    # for q in selectors:
+    #     # pylint: disable=c-extension-no-member
+    #     with pyodbc.connect(**conn) as cn:
+    #         cursor = cn.cursor()
+    #         cursor.execute(q)
+
+    #         col_mappings = [
+    #             (column[0], column[1].__name__) for column in cursor.description
+    #         ]
+
+    #         for row in cursor.fetchall():
+    #             o = {}
+    #             for i, cell in enumerate(row):
+    #                 key = col_mappings[i][0]
+    #                 dt = col_mappings[i][1]
+
+    #                 xform = xforms.get(key, dt)
+    #                 # print(key, "<====>", xform)
+    #                 fr = formatters.get(xform, lambda x: x)(cell)
+    #                 print("------------>", fr)
+
+    #                 o[key] = fr
+
+    #             print("--------------------------------")
 
     ########################################################
 
@@ -297,8 +324,6 @@ async def selector(
         return "Query returned no results"
 
     conn = repo.conn
-    print(conn)
-    print(asset)
 
     collection_args = {
         "recipe": recipes[asset],

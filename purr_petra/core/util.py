@@ -183,25 +183,6 @@ def datetime_formatter(
     return format_datetime
 
 
-def safe_numeric(x):
-    """Standardize some numeric types
-
-    Args:
-        x (Any): Some alleged numeric
-
-    Returns:
-        Number or None: a sanitized number
-    """
-    # see usage in handle_query()
-    if pd.isna(x) or x == "":
-        return None
-    try:
-        result = pd.to_numeric(x, errors="coerce")
-        return None if pd.isna(result) else result
-    except (ValueError, TypeError, OverflowError):
-        return None
-
-
 def timestamp_filename(repo_id: str, asset: str, ext: str = "json"):
     """Simple file name generator for JSON exports
 

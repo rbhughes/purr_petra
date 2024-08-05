@@ -1,55 +1,24 @@
-"""Petra asset query overview.
-
-Asset queries are well-centric. A parent well object is returned with every
-asset type. Actual asset data is returned in 'rollups' of child records.
-Sometimes this makes perfect sense, but occasionally a one-to-one
-relationship is represented as a single-item array.
-
-Why? Ideally, we would specify* exact columns and create more accurate joins
-for each asset. However, schemas changes have resulted in new tables and
-columns over the years, and that will likely continue. We take the pragmatic
-approach and just join on UWI.
-
-* Previous iterations of this utility used fully specified queries; contact
-me if you want more details.
-"""
+"""Petra asset query"""
 
 import json
-import re
-import struct
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, Optional, List, Generator
-import pyodbc
 import warnings
+from pathlib import Path
+from typing import Any, Dict, List
+import pandas as pd
+import numpy as np
+import pyodbc
 
 from purr_petra.core.dbisam import db_exec
-
-import pandas as pd
 from purr_petra.core.database import get_db
 from purr_petra.core.crud import get_repo_by_id, get_file_depot
-from purr_petra.assets.collect.select_recipes import recipes
-from purr_petra.core.util import (
-    async_wrap,
-    datetime_formatter,
-    CustomJSONEncoder,
-)
 from purr_petra.assets.collect.xformer import formatters
+from purr_petra.core.util import async_wrap, import_dict_from_file
 from purr_petra.core.logger import logger
 
 
 warnings.filterwarnings(
     "ignore", message="pandas only supports SQLAlchemy connectable.*"
 )
-# formatters = {
-#     "date": datetime_formatter(),
-#     "float": safe_numeric,
-#     "int": safe_numeric,
-#     "hex": lambda x: (
-#         x.hex() if isinstance(x, bytes) else (None if pd.isna(x) else str(x))
-#     ),
-#     "str": lambda x: str(x) if pd.notna(x) else "",
-# }
 
 
 def chunk_ids(ids, chunk):
@@ -75,7 +44,8 @@ def chunk_ids(ids, chunk):
     id_groups = {}
 
     for item in ids:
-        left = str(item).split("-")[0]
+        # left = str(item).split("-")[0]
+        left = str(item).split("-", maxsplit=1)[0]
         if left not in id_groups:
             id_groups[left] = []
         id_groups[left].append(item)
@@ -162,6 +132,8 @@ def transform_row_to_json(
 ) -> Dict[str, Any]:
     result = {}
     for column, value in row.items():
+        if pd.isna(value):
+            value = None
         # print(column, "<==>", value)
         for prefix, table_name in prefix_mapping.items():
             if column.startswith(prefix):
@@ -186,6 +158,8 @@ def transform_dataframe_to_json(
 def collect_and_assemble_docs(args: Dict[str, Any]):
     conn_params = args["conn"]
     recipe = args["recipe"]
+    out_file = args["out_file"]
+    xforms = recipe["xforms"]
 
     where = make_where_clause(args["uwi_list"])
 
@@ -200,22 +174,24 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
         select_sql = recipe["selector"].replace(recipe["purr_where"], in_clause)
         selectors.append(select_sql)
 
-    xforms = recipe["xforms"]
-
     all_columns = set()
 
     ######
-    out_file = args["out_file"]
-
+    docs_written = 0
     ######
 
-    with open(out_file, "w") as f:
+    if len(chunked_ids) == 0:
+        print("no hits")
+        return "no hits"
+
+    with open(out_file, "w", encoding="utf-8") as f:
         f.write("[")  # Start of JSON array
 
         first_chunk = True
 
         # Collect all data and column names
         for q in selectors:
+            # pylint: disable=c-extension-no-member
             with pyodbc.connect(**conn_params) as conn:
                 df = pd.read_sql(q, conn)
                 if not df.empty:
@@ -227,7 +203,8 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
                         df[col] = df[col].apply(formatters.get(xform, lambda x: x))
 
                     # Replace NaN with None for consistency
-                    df = df.where(pd.notnull(df), None)
+                    # df = df.where(pd.notnull(df), None)
+                    df = df.replace({np.nan: None})
 
                     # Transform the chunk to JSON
                     json_data = transform_dataframe_to_json(df, recipe["prefixes"])
@@ -238,98 +215,15 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
                     first_chunk = False
 
                     for json_obj in json_data:
-                        f.write(json.dumps(json_obj) + ",")
+                        json_str = json.dumps(json_obj, default=str)
+                        f.write(json_str + ",")
+                        docs_written += 1
 
         f.seek(f.tell() - 1, 0)  # Remove the last comma
         f.write("]")  # End of JSON array
 
-    print("Data written to", out_file)
-
-    ############
-
-    # for q in selectors:
-    #     # pylint: disable=c-extension-no-member
-    #     with pyodbc.connect(**conn) as cn:
-    #         cursor = cn.cursor()
-    #         cursor.execute(q)
-
-    #         col_mappings = [
-    #             (column[0], column[1].__name__) for column in cursor.description
-    #         ]
-
-    #         for row in cursor.fetchall():
-    #             o = {}
-    #             for i, cell in enumerate(row):
-    #                 key = col_mappings[i][0]
-    #                 dt = col_mappings[i][1]
-
-    #                 xform = xforms.get(key, dt)
-    #                 # print(key, "<====>", xform)
-    #                 fr = formatters.get(xform, lambda x: x)(cell)
-    #                 print("------------>", fr)
-
-    #                 o[key] = fr
-
-    #             print("--------------------------------")
-
-    ########################################################
-
-    # selector = add_where_clause(uwi_list=args["uwi_list"], sql=recipe["select"])
-    # identifier = add_where_clause(uwi_list=args["uwi_list"], sql=recipe["identify"])
-
-    # print("############################")
-    # print(ids)
-    # print("############################")
-
-    # x = db_exec(conn=conn, sql="select * from well")
-
-    # def get_column_mappings() -> Dict[str, str]:
-    #     """Get column names and (odbc-centric) datatypes from pyodbc
-
-    #     Returns:
-    #         Dict[str, str]: lower_case column names and datatypes
-    #     """
-    #     # pylint: disable=c-extension-no-member
-    #     with pyodbc.connect(**conn) as cn:
-    #         cursor = cn.cursor()
-    #         for x in cursor.columns(table="well"):
-    #             print(x)
-
-    # get_column_mappings()
-
-    # with pyodbc.connect(**conn) as cn:
-    #     cursor = cn.cursor()
-    #     cursor.execute(identifier)
-
-    #     for col in cursor.columns():
-    #         print(col)
-
-
-def export_json(records, export_file) -> str:
-    """Convert dicts to JSON and save the file.
-
-    Args:
-        records (List[Dict[str, Any]]): The list of dicts obtained by
-        collect_and_assemble_docs.
-        export_file (str): The timestamp export file name defined earlier
-
-    Returns:
-        str: A summary containing counts and file path
-
-    TODO: Investigate streaming?
-    """
-    db = next(get_db())
-    file_depot = get_file_depot(db)
-    db.close()
-    depot_path = Path(file_depot)
-
-    jd = json.dumps(records, indent=4, cls=CustomJSONEncoder)
-    out_file = Path(depot_path / export_file)
-
-    with open(out_file, "w", encoding="utf-8") as file:
-        file.write(jd)
-
-    return f"Exported {len(records)} docs to: {out_file}"
+    print(docs_written, " docs written to", out_file)
+    return f"{docs_written} docs written to {out_file}"
 
 
 async def selector(
@@ -356,12 +250,15 @@ async def selector(
     out_file = Path(depot_path / export_file)
 
     if repo is None:
-        return "Query returned no results"
+        return "Query returned no repo"
 
     conn = repo.conn
 
+    reci_path = Path(Path(__file__).resolve().parent, f"recipes/{asset}.py")
+    recipe = import_dict_from_file(reci_path, "recipe")
+
     collection_args = {
-        "recipe": recipes[asset],
+        "recipe": recipe,
         "repo_id": repo_id,
         "asset": asset,
         "conn": conn,
@@ -371,6 +268,10 @@ async def selector(
 
     async_collect_and_assemble_docs = async_wrap(collect_and_assemble_docs)
     records = await async_collect_and_assemble_docs(collection_args)
+
+    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+    print(records)
+    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
 
     # if len(records) > 0:
     #     async_export_json = async_wrap(export_json)

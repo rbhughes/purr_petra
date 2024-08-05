@@ -6,6 +6,7 @@ import hashlib
 import json
 import socket
 import time
+import importlib.util
 from datetime import datetime, date
 from functools import wraps, partial
 from pathlib import Path
@@ -230,3 +231,11 @@ def debugger(func: Callable[..., Any]) -> Callable[..., Any]:
             raise e
 
     return wrapper
+
+
+def import_dict_from_file(file_path, dict_name):
+    """TODO: stuff"""
+    spec = importlib.util.spec_from_file_location("module", file_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return getattr(module, dict_name)

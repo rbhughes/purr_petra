@@ -1,10 +1,11 @@
-purr_where = "__pUrRwHeRe__"
+"""Petra well"""
 
+purr_where = "__pUrRwHeRe__"
 identifier_keys = ["w.wsn"]
 id_form = " || '-' || ".join([f"CAST({i} AS VARCHAR(10))" for i in identifier_keys])
 
 
-WELL = {
+recipe = {
     "selector": f"""
     SELECT
     w.wsn          AS w_wsn,
@@ -177,7 +178,4 @@ WELL = {
         "z_last_act_date": "excel_date",
         "z_platform": "memo_to_string",
     },
-}
-recipes = {
-    "well": WELL,
 }

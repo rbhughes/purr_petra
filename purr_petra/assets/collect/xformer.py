@@ -4,7 +4,7 @@ import struct
 import pandas as pd
 from datetime import datetime, timedelta
 
-from typing import Any, Dict, Optional, List, Generator
+from typing import Any, Dict, Optional, List, Generator, Union
 
 
 def safe_string(x: Optional[str]) -> str:
@@ -29,9 +29,10 @@ def memo_to_string(x):
 
 def blob_to_hex(x):
     """just return a hex (for json serialization)"""
+    # TODO: check if 0x<hex> is valid, probably depends on use case
     if x is None:
         return None
-    return x.hex()
+    return f"0x{x.hex()}"
 
 
 def safe_numeric(x):
@@ -57,7 +58,9 @@ def excel_date(x):
         return None
 
 
-def parse_congressional(x: Optional[bytes]) -> Optional[Dict[str, Optional[str]]]:
+def parse_congressional(
+    x: Optional[bytes],
+) -> Optional[Dict[str, Union[Optional[str], Optional[float], Optional[int]]]]:
     """parse the binary congressional data to a dict"""
     if x is None:
         return None

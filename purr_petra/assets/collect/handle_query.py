@@ -114,10 +114,11 @@ def fetch_id_list(conn, id_sql):
     res = db_exec(conn, id_sql)
 
     ids = []
-    if "keylist" in res[0]:
+
+    if "keylist" in res[0] and res[0]["keylist"] is not None:
         ids = res[0]["keylist"].split(",")
-    elif "key" in res[0]:
-        ids = [x["key"] for x in res]
+    elif "key" in res[0] and res[0]["key"] is not None:
+        ids = res[0]["key"].split(",")
     else:
         print("key or keylist missing; cannot make id list")
 
@@ -156,6 +157,26 @@ def make_id_in_clauses(identifier_keys, ids):
 
 
 #######################################################################
+def transform_row_to_json(
+    row: pd.Series, prefix_mapping: Dict[str, str]
+) -> Dict[str, Any]:
+    result = {}
+    for column, value in row.items():
+        # print(column, "<==>", value)
+        for prefix, table_name in prefix_mapping.items():
+            if column.startswith(prefix):
+                if table_name not in result:
+                    result[table_name] = {}
+                result[table_name][column[len(prefix) :]] = value
+                break
+    return result
+
+
+def transform_dataframe_to_json(
+    df: pd.DataFrame, prefix_mapping: Dict[str, str]
+) -> List[Dict[str, Any]]:
+    return [transform_row_to_json(row, prefix_mapping) for _, row in df.iterrows()]
+
 
 #######################################################################
 
@@ -170,7 +191,7 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
     id_sql = recipe["identifier"].replace(recipe["purr_where"], where)
     ids = fetch_id_list(conn_params, id_sql)
-    chunked_ids = chunk_ids(ids, 4)
+    chunked_ids = chunk_ids(ids, 1000)
 
     selectors = []
 
@@ -181,38 +202,48 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
     xforms = recipe["xforms"]
 
-    ############
-    all_data = []
     all_columns = set()
 
-    # Collect all data and column names
-    for q in selectors:
-        # pylint: disable=c-extension-no-member
-        with pyodbc.connect(**conn_params) as conn:
-            df = pd.read_sql(q, conn)
-            if not df.empty:
-                all_data.extend(df.to_dict("records"))
-                all_columns.update(df.columns)
+    ######
+    out_file = args["out_file"]
 
-    if not all_data:
-        print("No data found.")
-        return pd.DataFrame(columns=list(all_columns))
+    ######
 
-    # Create a single DataFrame with all collected data
-    full_df = pd.DataFrame(all_data, columns=list(all_columns))
+    with open(out_file, "w") as f:
+        f.write("[")  # Start of JSON array
 
-    # Apply transformations
-    for col in full_df.columns:
-        xform = xforms.get(col, full_df[col].dtype.name)
-        full_df[col] = full_df[col].apply(formatters.get(xform, lambda x: x))
+        first_chunk = True
 
-    # Replace NaN with None for consistency
-    full_df = full_df.where(pd.notnull(full_df), None)
+        # Collect all data and column names
+        for q in selectors:
+            with pyodbc.connect(**conn_params) as conn:
+                df = pd.read_sql(q, conn)
+                if not df.empty:
+                    all_columns.update(df.columns)
 
-    # print(full_df.w_uwi, full_df.z_comp_date, full_df.z_last_act_date)
-    print(full_df.s_congress)
+                    # Apply transformations to the chunk
+                    for col in df.columns:
+                        xform = xforms.get(col, df[col].dtype.name)
+                        df[col] = df[col].apply(formatters.get(xform, lambda x: x))
 
-    return full_df
+                    # Replace NaN with None for consistency
+                    df = df.where(pd.notnull(df), None)
+
+                    # Transform the chunk to JSON
+                    json_data = transform_dataframe_to_json(df, recipe["prefixes"])
+
+                    # Write the JSON data to the file
+                    if not first_chunk:
+                        f.write(",")  # Separate JSON objects with a comma
+                    first_chunk = False
+
+                    for json_obj in json_data:
+                        f.write(json.dumps(json_obj) + ",")
+
+        f.seek(f.tell() - 1, 0)  # Remove the last comma
+        f.write("]")  # End of JSON array
+
+    print("Data written to", out_file)
 
     ############
 
@@ -318,7 +349,11 @@ async def selector(
 
     db = next(get_db())
     repo = get_repo_by_id(db, repo_id)
+    file_depot = get_file_depot(db)
     db.close()
+
+    depot_path = Path(file_depot)
+    out_file = Path(depot_path / export_file)
 
     if repo is None:
         return "Query returned no results"
@@ -331,6 +366,7 @@ async def selector(
         "asset": asset,
         "conn": conn,
         "uwi_list": uwi_list,
+        "out_file": out_file,
     }
 
     async_collect_and_assemble_docs = async_wrap(collect_and_assemble_docs)

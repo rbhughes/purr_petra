@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 import pandas as pd
 import numpy as np
 import pyodbc
+import collections.abc
 
 from purr_petra.core.dbisam import db_exec
 from purr_petra.core.database import get_db
@@ -14,6 +15,8 @@ from purr_petra.core.crud import get_repo_by_id, get_file_depot
 from purr_petra.assets.collect.xformer import formatters
 from purr_petra.core.util import async_wrap, import_dict_from_file
 from purr_petra.core.logger import logger
+
+from purr_petra.assets.collect.xformer import PURR_WHERE
 
 
 warnings.filterwarnings(
@@ -132,9 +135,16 @@ def transform_row_to_json(
 ) -> Dict[str, Any]:
     result = {}
     for column, value in row.items():
-        if pd.isna(value):
-            value = None
-        # print(column, "<==>", value)
+        if isinstance(value, np.ndarray):
+            value = value.tolist()
+        elif not isinstance(value, list):
+            if pd.isna(value):
+                value = None
+
+        # if not isinstance(value, np.ndarray) and not isinstance(value, list):
+        #     if pd.isna(value):
+        #         value = None
+
         for prefix, table_name in prefix_mapping.items():
             if column.startswith(prefix):
                 if table_name not in result:
@@ -153,6 +163,21 @@ def transform_dataframe_to_json(
 #######################################################################
 
 
+def map_col_type(sql_type):
+    """
+    Map SQL data types to pandas data types.
+    """
+    type_map = {
+        int: "int64",
+        str: "string",
+        float: "float64",
+        bool: "bool",
+        type(None): "object",
+        "datetime64[ns]": "datetime64[ns]",
+    }
+    return type_map.get(sql_type, "object")
+
+
 #######################################################################
 # def collect_and_assemble_docs(args: Dict[str, Any]) -> List[Dict[str, Any]]:
 def collect_and_assemble_docs(args: Dict[str, Any]):
@@ -163,7 +188,7 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
     where = make_where_clause(args["uwi_list"])
 
-    id_sql = recipe["identifier"].replace(recipe["purr_where"], where)
+    id_sql = recipe["identifier"].replace(PURR_WHERE, where)
     ids = fetch_id_list(conn_params, id_sql)
     chunked_ids = chunk_ids(ids, 1000)
 
@@ -171,7 +196,7 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
     for c in chunked_ids:
         in_clause = make_id_in_clauses(recipe["identifier_keys"], c)
-        select_sql = recipe["selector"].replace(recipe["purr_where"], in_clause)
+        select_sql = recipe["selector"].replace(PURR_WHERE, in_clause)
         selectors.append(select_sql)
 
     all_columns = set()
@@ -191,25 +216,59 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
         # Collect all data and column names
         for q in selectors:
+            # print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
+            # print(q)
+            # print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
+
             # pylint: disable=c-extension-no-member
             with pyodbc.connect(**conn_params) as conn:
-                df = pd.read_sql(q, conn)
+                cursor = conn.cursor()
+                cursor.execute(q)
+                cursor_desc = cursor.description
+
+                column_names = [col[0] for col in cursor_desc]
+                column_types = {col[0]: map_col_type(col[1]) for col in cursor_desc}
+
+                data = [tuple(row) for row in cursor.fetchall()]
+
+                df = pd.DataFrame(data, columns=column_names)
+
+                for col, col_type in column_types.items():
+                    if "int" in col_type:
+                        df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
+                        df[col] = df[col].astype("Int64")
+                    elif "str" in col_type:
+                        df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
+                        df[col] = df[col].astype("string")
+                    else:
+                        df[col] = df[col].astype(col_type)
+
                 if not df.empty:
                     all_columns.update(df.columns)
 
-                    # Apply transformations to the chunk
                     for col in df.columns:
-                        xform = xforms.get(col, df[col].dtype.name)
-                        df[col] = df[col].apply(formatters.get(xform, lambda x: x))
+                        col_type = str(df.dtypes[col])
 
-                    # Replace NaN with None for consistency
-                    # df = df.where(pd.notnull(df), None)
+                        xform = xforms.get(col, col_type)
+                        # print(f"{col} @@@@@ xform={xform}  col_type={col_type}")
+
+                        formatter = formatters.get(xform, lambda x: x)
+
+                        # pylint: disable=cell-var-from-loop
+                        df[col] = df[col].apply(formatter)
+
                     df = df.replace({np.nan: None})
 
-                    # Transform the chunk to JSON
+                    print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+                    grouped = df.groupby("w_wsn")
+                    print(grouped)
+
+                    print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+
+                    # transform this chunk by table prefixes
                     json_data = transform_dataframe_to_json(df, recipe["prefixes"])
 
-                    # Write the JSON data to the file
+                    # # Write JSON data to file
                     if not first_chunk:
                         f.write(",")  # Separate JSON objects with a comma
                     first_chunk = False
@@ -220,7 +279,7 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
                         docs_written += 1
 
         f.seek(f.tell() - 1, 0)  # Remove the last comma
-        f.write("]")  # End of JSON array
+        f.write("]")
 
     print(docs_written, " docs written to", out_file)
     return f"{docs_written} docs written to {out_file}"

@@ -1,12 +1,11 @@
 """Petra well"""
 
-purr_where = "__pUrRwHeRe__"
+from purr_petra.assets.collect.xformer import PURR_WHERE
+
 identifier_keys = ["w.wsn"]
 id_form = " || '-' || ".join([f"CAST({i} AS VARCHAR(10))" for i in identifier_keys])
 
-
-recipe = {
-    "selector": f"""
+selector = f"""
     SELECT
     w.wsn          AS w_wsn,
     w.flags        AS w_flags,
@@ -114,9 +113,10 @@ recipe = {
     LEFT OUTER JOIN zdata z_19 ON w.wsn = z_19.wsn AND z_19.fid = 19
     LEFT OUTER JOIN zflddef f ON f.zid = 2 AND f.fid = w.elev_zid
     LEFT OUTER JOIN zdata z_20 ON w.wsn = z_20.wsn AND z_20.fid = w.elev_fid
-    {purr_where}
-    """,
-    "identifier": f"""
+    {PURR_WHERE}
+    """
+
+identifier = f"""
     SELECT
       LIST({id_form}) as keylist
     FROM well w
@@ -144,8 +144,12 @@ recipe = {
     LEFT OUTER JOIN zdata z_19 ON w.wsn = z_19.wsn AND z_19.fid = 19
     LEFT OUTER JOIN zflddef f ON f.zid = 2 AND f.fid = w.elev_zid
     LEFT OUTER JOIN zdata adv ON w.wsn = adv.wsn AND adv.fid = w.elev_fid
-    {purr_where}
-    """,
+    {PURR_WHERE}
+    """
+
+recipe = {
+    "selector": selector,
+    "identifier": identifier,
     "prefixes": {
         "w_": "well",
         "s_": "locat",
@@ -155,7 +159,6 @@ recipe = {
         "f_": "zflddef",
     },
     "identifier_keys": identifier_keys,
-    "purr_where": purr_where,
     "xforms": {
         "w_adddate": "excel_date",
         "w_chgdate": "excel_date",

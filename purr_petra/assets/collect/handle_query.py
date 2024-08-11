@@ -16,6 +16,8 @@ from purr_petra.assets.collect.xformer import formatters
 from purr_petra.core.util import async_wrap, import_dict_from_file
 from purr_petra.core.logger import logger
 
+from purr_petra.assets.collect.post_process import post_process
+
 from purr_petra.assets.collect.xformer import PURR_WHERE
 
 
@@ -259,11 +261,16 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
                     df = df.replace({np.nan: None})
 
-                    print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-                    grouped = df.groupby("w_wsn")
-                    print(grouped)
+                    if asset := recipe.get("post_process"):
+                        post_processor = post_process[asset]
+                        if post_processor:
+                            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+                            print("post-processing HAPPENING ", asset)
+                            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+                            df = post_processor(df)
 
-                    print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+                    # for _, row in df.iterrows():
+                    #     print(row.to_dict())
 
                     # transform this chunk by table prefixes
                     json_data = transform_dataframe_to_json(df, recipe["prefixes"])
@@ -319,7 +326,7 @@ async def selector(
     collection_args = {
         "recipe": recipe,
         "repo_id": repo_id,
-        "asset": asset,
+        # "asset": asset,
         "conn": conn,
         "uwi_list": uwi_list,
         "out_file": out_file,

@@ -89,5 +89,5 @@ recipe = {
         "f_mts": "memo_to_string",
         "f_chgdate": "excel_date",
     },
-    "post_process": ["aggregate_fmtest"],
+    "post_process": "dst_agg",
 }

@@ -13,6 +13,31 @@ PURR_NULL = "_purrNULL_"
 PURR_DELIM = "_purrDELIM_"
 PURR_WHERE = "_purrWHERE_"
 
+################################################################################
+
+
+def decode_string(buffer, start, end):
+    """Decode a null-terminated string"""
+    return buffer[start:end].decode().split("\x00")[0]
+
+
+def unpack_double(buffer, start):
+    """Unpack a double (8 bytes)"""
+    return struct.unpack("<d", buffer[start : start + 8])[0]
+
+
+def unpack_short(buffer, start):
+    """Unpack a short(2 bytes)"""
+    return struct.unpack("<h", buffer[start : start + 2])[0]
+
+
+def unpack_int(buffer, start):
+    """Unpack an integer (4 bytes)"""
+    return struct.unpack("<i", buffer[start : start + 4])[0]
+
+
+################################################################################
+
 
 def safe_string(x: Optional[str]) -> Optional[str]:
     """remove control, non-printable chars, ensure UTF-8, strip whitespace."""
@@ -41,7 +66,7 @@ def safe_string(x: Optional[str]) -> Optional[str]:
 
 
 def safe_float(x: Optional[float]) -> Optional[float]:
-    """Convert input to a float if possible, otherwise return None."""
+    """Convert input to a float or None"""
     if pd.isna(x):
         return None
     try:
@@ -52,7 +77,7 @@ def safe_float(x: Optional[float]) -> Optional[float]:
 
 
 def safe_int(x: Optional[int]) -> Optional[int]:
-    """Convert input to an integer if possible, otherwise return None."""
+    """Convert input to an int or None"""
     if x is None:
         return None
     try:
@@ -63,7 +88,7 @@ def safe_int(x: Optional[int]) -> Optional[int]:
 
 
 def memo_to_string(x):
-    """strip control chars from DBISAM memo"""
+    """Strip control chars from DBISAM memo"""
     if x is None:
         return None
     if str(x) == "<NA>":  # probably pandas._libs.missing.NAType'
@@ -72,15 +97,14 @@ def memo_to_string(x):
 
 
 def blob_to_hex(x):
-    """just return a hex (for json serialization)"""
-    # TODO: check if 0x<hex> is valid, probably depends on use case
+    """Just return a hex string (for json serialization)"""
     if x is None:
         return None
     return f"0x{x.hex()}"
 
 
 def excel_date(x):
-    """convert Petra's weird (excel?) date float to real date"""
+    """Convert Petra's weird (excel?) date float to ISO date"""
     if x is None:
         return None
     if re.match(r"1[eE]\+?30", str(x), re.IGNORECASE):
@@ -92,14 +116,8 @@ def excel_date(x):
 
 
 def logdata_digits(x):
-    """Unpack log curve digits from a bytes object.
+    """Unpack log curve digits from a bytes"""
 
-    Args:
-        x (Optional[bytes]): The bytes object containing the log curve digits.
-
-    Returns:
-        Optional[np.ndarray]: A NumPy array of unpacked double-precision floats, or None if input is None or empty.
-    """
     if x is None or len(x) == 0:
         return None
 
@@ -119,57 +137,82 @@ def loglas_lashdr(x):
 def parse_congressional(
     x: Optional[bytes],
 ) -> Optional[Dict[str, Union[Optional[str], Optional[float], Optional[int]]]]:
-    """parse the binary congressional data to a dict"""
+    """parse binary congressional data to a dict"""
     if x is None:
         return None
 
-    def decode_field(start: int, end: int) -> Optional[str]:
-        try:
-            return x[start:end].decode().split("\x00")[0]
-        except (IndexError, UnicodeDecodeError):
-            return None
-
-    def unpack_double(start: int) -> Optional[float]:
-        try:
-            return struct.unpack("<d", x[start : start + 8])[0]
-        except struct.error:
-            return None
-
-    def unpack_short(start: int) -> Optional[int]:
-        try:
-            return struct.unpack("<h", x[start : start + 2])[0]
-        except struct.error:
-            return None
-
     return {
-        "township": decode_field(4, 6),
-        "township_ns": decode_field(71, 72),
-        "range": decode_field(21, 23),
-        "range_ew": decode_field(70, 71),
-        "section": decode_field(38, 54),
-        "section_suffix": decode_field(54, 70),
-        "meridian": decode_field(153, 155),
-        "footage_ref": decode_field(137, 152),
-        "spot": decode_field(96, 136),
-        "footage_call_ns": unpack_double(88),
-        "footage_call_ns_ref": unpack_short(76),
-        "footage_call_ew": unpack_double(80),
-        "footage_call_ew_ref": unpack_short(72),
-        "remarks": decode_field(156, 412),
+        "township": decode_string(x, 4, 6),
+        "township_ns": decode_string(x, 71, 72),
+        "range": decode_string(x, 21, 23),
+        "range_ew": decode_string(x, 70, 71),
+        "section": decode_string(x, 38, 54),
+        "section_suffix": decode_string(x, 54, 70),
+        "meridian": decode_string(x, 153, 155),
+        "footage_ref": decode_string(x, 137, 152),
+        "spot": decode_string(x, 96, 136),
+        "footage_call_ns": unpack_double(x, 88),
+        "footage_call_ns_ref": unpack_short(x, 76),
+        "footage_call_ew": unpack_double(x, 80),
+        "footage_call_ew_ref": unpack_short(x, 72),
+        "remarks": decode_string(x, 156, 412),
     }
+
+
+def pdtest_treatment(x: Optional[bytes]) -> Optional[List[Dict[str, Any]]]:
+    """parse binary pdtest.treat data to a dict"""
+
+    def parse_treatment(buffer):
+        return {
+            "type": decode_string(buffer, 0, 9),
+            "top": unpack_double(buffer, 9),
+            "base": unpack_double(buffer, 17),
+            "amount1": unpack_double(buffer, 25),
+            "units1": decode_string(buffer, 61, 65),
+            "desc": decode_string(buffer, 68, 89),
+            "agent": decode_string(buffer, 89, 96),
+            "amount2": unpack_double(buffer, 33),
+            "units2": decode_string(buffer, 96, 100),
+            "fmbrk": unpack_double(buffer, 41),
+            "num_stages": unpack_int(buffer, 57),
+            "additive": decode_string(buffer, 103, 110),
+            "inj_rate": unpack_double(buffer, 49),
+        }
+
+    num_bytes = 110
+    treatments = (
+        [parse_treatment(x[i : i + num_bytes]) for i in range(0, len(x), num_bytes)]
+        if x is not None
+        else []
+    )
+    return treatments
 
 
 def fmtest_recovery(x: Optional[bytes]) -> List[Dict[str, Union[float, str]]]:
     if x is None:
         return []
 
-    def parse_recovery(chunk: bytes):
-        amount = struct.unpack("<d", chunk[:8])[0]
-        units = chunk[8:15].decode().split("\x00")[0]
-        descriptions = chunk[15:36].decode().split("\x00")[0]
-        return {"amount": amount, "units": units, "descriptions": descriptions}
+    def parse_recovery(buffer):
+        return {
+            "amount": unpack_double(buffer, 0),
+            "units": decode_string(buffer, 8, 15),
+            "descriptions": decode_string(buffer, 15, 36),
+        }
 
-    return [parse_recovery(x[i : i + 36]) for i in range(0, len(x), 36)]
+    num_bytes = 36
+    recoveries = (
+        [parse_recovery(x[i : i + num_bytes]) for i in range(0, len(x), num_bytes)]
+        if x is not None
+        else []
+    )
+    return recoveries
+
+
+def parse_zztops(x: Optional[bytes]) -> List[float]:
+    if x is None:
+        return []
+    num_bytes = 28
+    return [unpack_double(x, i) for i in range(4, len(x), num_bytes)]
 
 
 def array_of_int(x):
@@ -210,4 +253,6 @@ formatters = {
     "array_of_string": array_of_int,
     "array_of_excel_date": array_of_int,
     "fmtest_recovery": fmtest_recovery,
+    "pdtest_treatment": pdtest_treatment,
+    "parse_zztops": parse_zztops,
 }

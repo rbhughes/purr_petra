@@ -218,9 +218,9 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
         # Collect all data and column names
         for q in selectors:
-            # print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
-            # print(q)
-            # print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
+            print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
+            print(q)
+            print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
 
             # pylint: disable=c-extension-no-member
             with pyodbc.connect(**conn_params) as conn:

@@ -191,6 +191,11 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
     where = make_where_clause(args["uwi_list"])
 
     id_sql = recipe["identifier"].replace(PURR_WHERE, where)
+
+    print("id_qqqqqqqqqqqqqqqqqqqqqqqqqqq")
+    print(id_sql)
+    print("id_qqqqqqqqqqqqqqqqqqqqqqqqqqq")
+
     ids = fetch_id_list(conn_params, id_sql)
     chunked_ids = chunk_ids(ids, 1000)
 

@@ -130,6 +130,9 @@ def logdata_digits(x):
 
 def loglas_lashdr(x):
     """decode the LAS header"""
+    if x is None or len(x) == 0:
+        return None
+
     b = [re.sub(r'^"|"$', "", r) for r in bytes(x).decode("utf-8").split(";")]
     return "\n".join(b)
 

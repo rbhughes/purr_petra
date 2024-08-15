@@ -22,6 +22,12 @@ selector = f"""
     s.lat          AS s_lat,
     s.lon          AS s_lon,
 
+    u.wsn          AS u_wsn,
+    u.uwi          AS u_uwi,
+    u.label        AS u_label,
+    u.sortname     AS u_sortname,
+    u.flags        AS u_flags,
+
     a.ldsn         AS a_ldsn,
     a.wsn          AS a_wsn,
     a.lsn          AS a_lsn,
@@ -64,13 +70,7 @@ selector = f"""
     g.adddate      AS g_adddate,
     g.chgdate      AS g_chgdate,
     g.hdrsize      AS g_hdrsize,
-    g.lashdr       AS g_lashdr,
-
-    u.wsn          AS u_wsn,
-    u.uwi          AS u_uwi,
-    u.label        AS u_label,
-    u.sortname     AS u_sortname,
-    u.flags        AS u_flags
+    g.lashdr       AS g_lashdr
 
     FROM well w
     LEFT JOIN uwi u ON u.wsn = w.wsn
@@ -101,11 +101,11 @@ recipe = {
     "prefixes": {
         "w_": "well",
         "s_": "locat",
+        "u_": "uwi",
         "a_": "logdata",
         "f_": "logdef",
         "x_": "logdatax",
         "g_": "loglas",
-        "u_": "uwi",
     },
     "identifier_keys": identifier_keys,
     "xforms": {

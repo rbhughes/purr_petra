@@ -230,6 +230,10 @@ def array_of_string(x):
     return [safe_string(v) if v != PURR_NULL else None for v in x.split(PURR_DELIM)]
 
 
+# def array_of_hex(x):
+#     return [blob_to_hex(v) if v != PURR_NULL else None for v in x.split(PURR_DELIM)]
+
+
 def array_of_excel_date(x):
     return [excel_date(v) if v != PURR_NULL else None for v in x.split(PURR_DELIM)]
 

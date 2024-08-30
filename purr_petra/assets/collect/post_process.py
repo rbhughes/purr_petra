@@ -39,4 +39,21 @@ def ip_agg(df):
     return df.groupby("w_wsn", as_index=False).agg(agg_dict)
 
 
-post_process = {"dst_agg": dst_agg, "ip_agg": ip_agg}
+def production_agg(df):
+    agg_columns = [col for col in df.columns if col.startswith("a_")]
+    agg_dict = {col: preserve_empty_lists for col in agg_columns}
+
+    other_columns = [
+        col for col in df.columns if col not in agg_columns and col != "w_wsn"
+    ]
+    for col in other_columns:
+        agg_dict[col] = "first"
+
+    return df.groupby("w_wsn", as_index=False).agg(agg_dict)
+
+
+post_process = {
+    "dst_agg": dst_agg,
+    "ip_agg": ip_agg,
+    "production_agg": production_agg,
+}

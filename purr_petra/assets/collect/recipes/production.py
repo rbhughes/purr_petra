@@ -2,7 +2,8 @@
 
 from purr_petra.assets.collect.xformer import PURR_DELIM, PURR_NULL, PURR_WHERE
 
-identifier_keys = ["w.wsn", "f.mid"]
+# identifier_keys = ["w.wsn", "f.mid"]
+identifier_keys = ["w.wsn"]
 id_form = " || '-' || ".join([f"CAST({i} AS VARCHAR(10))" for i in identifier_keys])
 
 selector = f"""
@@ -65,15 +66,33 @@ selector = f"""
     GROUP BY w.wsn, f.mid
     """
 
+# identifier = f"""
+#     SELECT
+#         {id_form} AS key
+#     FROM mopddef f
+#     JOIN mopddata a ON a.mid = f.mid
+#     JOIN well w ON a.wsn = w.wsn
+#     LEFT JOIN uwi u ON u.wsn = w.wsn
+#     {PURR_WHERE}
+#     GROUP BY key
+#     """
+
+# identifier = f"""
+#     SELECT DISTINCT
+#         CAST(a.wsn AS VARCHAR(10)) || '-' || CAST(a.mid AS VARCHAR(10)) AS key
+#     FROM mopddata a
+#     JOIN well w ON a.wsn = w.wsn
+#     LEFT JOIN uwi u ON u.wsn = w.wsn
+#     {PURR_WHERE}
+#     """
+
 identifier = f"""
-    SELECT
+    SELECT DISTINCT
         {id_form} AS key
-    FROM mopddef f
-    JOIN mopddata a ON a.mid = f.mid
+    FROM mopddata a
     JOIN well w ON a.wsn = w.wsn
     LEFT JOIN uwi u ON u.wsn = w.wsn
     {PURR_WHERE}
-    GROUP BY key
     """
 
 recipe = {
@@ -110,4 +129,5 @@ recipe = {
         "a_dec": "array_of_float",
         "a_chgdate": "array_of_excel_date",
     },
+    "post_process": "production_agg",
 }

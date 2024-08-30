@@ -88,12 +88,16 @@ def fetch_id_list(conn, id_sql):
 
     res = db_exec(conn, id_sql)
 
+    print("$$$$$$$$$$")
+    print(res)
+    print("$$$$$$$$$$")
+
     ids = []
 
     if "keylist" in res[0] and res[0]["keylist"] is not None:
         ids = res[0]["keylist"].split(",")
     elif "key" in res[0] and res[0]["key"] is not None:
-        ids = res[0]["key"].split(",")
+        ids = [k["key"] for k in res]
     else:
         print("key or keylist missing; cannot make id list")
 
@@ -197,6 +201,10 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
     print("id_qqqqqqqqqqqqqqqqqqqqqqqqqqq")
 
     ids = fetch_id_list(conn_params, id_sql)
+
+    print("outtro $$$$$$$$$$$$")
+    print(ids)
+    print("outtro $$$$$$$$$$$$")
     chunked_ids = chunk_ids(ids, 1000)
 
     selectors = []

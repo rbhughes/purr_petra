@@ -181,4 +181,5 @@ recipe = {
         "z_last_act_date": "excel_date",
         "z_platform": "memo_to_string",
     },
+    "chunk_size": 5000,
 }

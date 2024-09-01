@@ -130,4 +130,5 @@ recipe = {
         "a_chgdate": "array_of_excel_date",
     },
     "post_process": "production_agg",
+    "chunk_size": 1000,
 }

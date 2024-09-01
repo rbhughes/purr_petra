@@ -88,9 +88,9 @@ def fetch_id_list(conn, id_sql):
 
     res = db_exec(conn, id_sql)
 
-    print("$$$$$$$$$$")
-    print(res)
-    print("$$$$$$$$$$")
+    # print("$$$$$$$$$$")
+    # print(res)
+    # print("$$$$$$$$$$")
 
     ids = []
 
@@ -185,27 +185,25 @@ def map_col_type(sql_type):
 
 
 #######################################################################
-# def collect_and_assemble_docs(args: Dict[str, Any]) -> List[Dict[str, Any]]:
 def collect_and_assemble_docs(args: Dict[str, Any]):
     conn_params = args["conn"]
     recipe = args["recipe"]
     out_file = args["out_file"]
     xforms = recipe["xforms"]
 
+    # control memory by the number of "ids" in the where clause of a selector
+    chunk_size = recipe["chunk_size"] if "chunk_size" in recipe else 1000
+
     where = make_where_clause(args["uwi_list"])
 
     id_sql = recipe["identifier"].replace(PURR_WHERE, where)
 
-    print("id_qqqqqqqqqqqqqqqqqqqqqqqqqqq")
-    print(id_sql)
-    print("id_qqqqqqqqqqqqqqqqqqqqqqqqqqq")
-
     ids = fetch_id_list(conn_params, id_sql)
 
-    print("outtro $$$$$$$$$$$$")
-    print(ids)
-    print("outtro $$$$$$$$$$$$")
-    chunked_ids = chunk_ids(ids, 1000)
+    chunked_ids = chunk_ids(ids, chunk_size)
+
+    if len(chunked_ids) == 0:
+        return "no hits"
 
     selectors = []
 
@@ -220,20 +218,16 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
     docs_written = 0
     ######
 
-    if len(chunked_ids) == 0:
-        print("no hits")
-        return "no hits"
-
     with open(out_file, "w", encoding="utf-8") as f:
         f.write("[")  # Start of JSON array
 
-        first_chunk = True
+        # first_chunk = True
 
         # Collect all data and column names
         for q in selectors:
-            print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
-            print(q)
-            print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
+            # print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
+            # print(q)
+            # print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
 
             # pylint: disable=c-extension-no-member
             with pyodbc.connect(**conn_params) as conn:
@@ -265,7 +259,6 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
                         col_type = str(df.dtypes[col])
 
                         xform = xforms.get(col, col_type)
-                        # print(f"{col} @@@@@ xform={xform}  col_type={col_type}")
 
                         formatter = formatters.get(xform, lambda x: x)
 
@@ -277,9 +270,7 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
                     if asset := recipe.get("post_process"):
                         post_processor = post_process[asset]
                         if post_processor:
-                            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-                            print("post-processing HAPPENING ", asset)
-                            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+                            print("post-processing", asset)
                             df = post_processor(df)
 
                     # for _, row in df.iterrows():
@@ -289,10 +280,11 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
                     json_data = transform_dataframe_to_json(df, recipe["prefixes"])
 
                     # # Write JSON data to file
-                    if not first_chunk:
-                        f.write(",")  # Separate JSON objects with a comma
-                    first_chunk = False
+                    # if not first_chunk:
+                    #     f.write(",")  # Separate JSON objects with a comma
+                    # first_chunk = False
 
+                    # TODO: test efficiency vs memory (maybe just send it all)
                     for json_obj in json_data:
                         json_str = json.dumps(json_obj, default=str)
                         f.write(json_str + ",")
@@ -301,8 +293,11 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
         f.seek(f.tell() - 1, 0)  # Remove the last comma
         f.write("]")
 
-    print(docs_written, " docs written to", out_file)
-    return f"{docs_written} docs written to {out_file}"
+    # return f"{docs_written} docs written to {out_file}"
+    return {
+        "message": f"{docs_written} {asset} docs written",
+        "out_file": out_file,
+    }
 
 
 async def selector(
@@ -333,27 +328,33 @@ async def selector(
 
     conn = repo.conn
 
-    reci_path = Path(Path(__file__).resolve().parent, f"recipes/{asset}.py")
-    recipe = import_dict_from_file(reci_path, "recipe")
+    recipe_path = Path(Path(__file__).resolve().parent, f"recipes/{asset}.py")
+    recipe = import_dict_from_file(recipe_path, "recipe")
 
     collection_args = {
         "recipe": recipe,
         "repo_id": repo_id,
-        # "asset": asset,
         "conn": conn,
         "uwi_list": uwi_list,
         "out_file": out_file,
     }
 
     async_collect_and_assemble_docs = async_wrap(collect_and_assemble_docs)
-    records = await async_collect_and_assemble_docs(collection_args)
+    result = await async_collect_and_assemble_docs(collection_args)
 
     print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-    print(records)
+    print(result)
+    print("-------------------------------------------------")
+    # with open(result["out_file"], "r") as file:
+    #     data = json.load(file)
+    #     print(json.dumps(data, indent=2))
     print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
 
-    # if len(records) > 0:
-    #     async_export_json = async_wrap(export_json)
-    #     return await async_export_json(records, export_file)
-    # else:
-    #     return "Query returned no results"
+
+# Print the JSON data with indentation
+
+# if len(records) > 0:
+#     async_export_json = async_wrap(export_json)
+#     return await async_export_json(records, export_file)
+# else:
+#     return "Query returned no results"

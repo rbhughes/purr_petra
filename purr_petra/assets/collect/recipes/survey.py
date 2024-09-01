@@ -107,4 +107,5 @@ recipe = {
         "v_d2": "array_of_float",
         "v_d3": "array_of_float",
     },
+    "chunk_size": 1000,
 }

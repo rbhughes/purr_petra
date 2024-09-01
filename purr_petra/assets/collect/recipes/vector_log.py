@@ -118,4 +118,5 @@ recipe = {
         "g_chgdate": "excel_date",
         "g_lashdr": "loglas_lashdr",
     },
+    "chunk_size": 1000,
 }

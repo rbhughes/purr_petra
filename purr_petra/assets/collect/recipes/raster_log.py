@@ -71,4 +71,5 @@ recipe = {
     "xforms": {
         "w_chgdate": "excel_date",
     },
+    "chunk_size": 5000,
 }

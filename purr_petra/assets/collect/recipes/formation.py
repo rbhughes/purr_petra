@@ -113,4 +113,5 @@ recipe = {
         "t_chgdate": "excel_date",
         "t_data": "parse_zztops",
     },
+    "chunk_size": 5000,
 }

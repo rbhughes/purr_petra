@@ -84,4 +84,5 @@ recipe = {
         "p_remark": "memo_to_string",
         "p_chgdate": "excel_date",
     },
+    "chunk_size": 5000,
 }

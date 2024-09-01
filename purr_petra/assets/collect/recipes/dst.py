@@ -90,4 +90,5 @@ recipe = {
         "f_chgdate": "excel_date",
     },
     "post_process": "dst_agg",
+    "chunk_size": 5000,
 }

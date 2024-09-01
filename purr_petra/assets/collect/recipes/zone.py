@@ -146,4 +146,5 @@ recipe = {
         "n_chgdate": "excel_date",
         "n_remarks": "memo_to_string",  # array_of_memo?
     },
+    "chunk_size": 1000,
 }

@@ -93,4 +93,5 @@ recipe = {
         "p_chgdate": "excel_date",
     },
     "post_process": "ip_agg",
+    "chunk_size": 5000,
 }

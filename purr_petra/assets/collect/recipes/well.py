@@ -116,7 +116,7 @@ selector = f"""
     {PURR_WHERE}
     """
 
-identifier = f"""
+identifier_SLOW = f"""
     SELECT
       LIST({id_form}) as keylist
     FROM well w
@@ -147,9 +147,21 @@ identifier = f"""
     {PURR_WHERE}
     """
 
+identifier_FAST = f"""
+    SELECT DISTINCT
+      {id_form} AS key
+    FROM well w
+    LEFT JOIN locat s ON s.wsn = w.wsn
+    LEFT JOIN bhloc b ON b.wsn = w.wsn
+    LEFT JOIN uwi u ON u.wsn = w.wsn
+    LEFT OUTER JOIN zdata z ON w.wsn = z.wsn
+    {PURR_WHERE}
+    """
+
+
 recipe = {
     "selector": selector,
-    "identifier": identifier,
+    "identifier": identifier_FAST,
     "prefixes": {
         "w_": "well",
         "s_": "locat",

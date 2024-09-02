@@ -184,6 +184,39 @@ def map_col_type(sql_type):
     return type_map.get(sql_type, "object")
 
 
+###
+def create_selectors(chunked_ids, recipe):
+    selectors = []
+    for chunk in chunked_ids:
+        in_clause = make_id_in_clauses(recipe["identifier_keys"], chunk)
+        select_sql = recipe["selector"].replace(PURR_WHERE, in_clause)
+        selectors.append(select_sql)
+    return selectors
+
+
+def get_column_info(cursor):
+    cursor_desc = cursor.description
+    column_names = [col[0] for col in cursor_desc]
+    column_types = {col[0]: map_col_type(col[1]) for col in cursor_desc}
+    return column_names, column_types
+
+
+def standardize_df_columns(df: pd.DataFrame, column_types: Dict[str, str]):
+    for col, col_type in column_types.items():
+        if "int" in col_type:
+            df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
+            df[col] = df[col].astype("Int64")
+        elif "str" in col_type:
+            df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
+            df[col] = df[col].astype("string")
+        else:
+            df[col] = df[col].astype(col_type)
+    return df
+
+
+###
+
+
 #######################################################################
 def collect_and_assemble_docs(args: Dict[str, Any]):
     conn_params = args["conn"]
@@ -198,6 +231,10 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
     id_sql = recipe["identifier"].replace(PURR_WHERE, where)
 
+    print("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
+    print(id_sql)
+    print("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
+
     ids = fetch_id_list(conn_params, id_sql)
 
     chunked_ids = chunk_ids(ids, chunk_size)
@@ -205,12 +242,7 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
     if len(chunked_ids) == 0:
         return "no hits"
 
-    selectors = []
-
-    for c in chunked_ids:
-        in_clause = make_id_in_clauses(recipe["identifier_keys"], c)
-        select_sql = recipe["selector"].replace(PURR_WHERE, in_clause)
-        selectors.append(select_sql)
+    selectors = create_selectors(chunked_ids, recipe)
 
     all_columns = set()
 
@@ -221,36 +253,23 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
     with open(out_file, "w", encoding="utf-8") as f:
         f.write("[")  # Start of JSON array
 
-        # first_chunk = True
-
-        # Collect all data and column names
         for q in selectors:
-            # print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
-            # print(q)
-            # print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
+            print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
+            print(q)
+            print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
 
             # pylint: disable=c-extension-no-member
             with pyodbc.connect(**conn_params) as conn:
                 cursor = conn.cursor()
                 cursor.execute(q)
-                cursor_desc = cursor.description
 
-                column_names = [col[0] for col in cursor_desc]
-                column_types = {col[0]: map_col_type(col[1]) for col in cursor_desc}
+                column_names, column_types = get_column_info(cursor)
 
-                data = [tuple(row) for row in cursor.fetchall()]
+                df = pd.DataFrame(
+                    [tuple(row) for row in cursor.fetchall()], columns=column_names
+                )
 
-                df = pd.DataFrame(data, columns=column_names)
-
-                for col, col_type in column_types.items():
-                    if "int" in col_type:
-                        df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
-                        df[col] = df[col].astype("Int64")
-                    elif "str" in col_type:
-                        df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
-                        df[col] = df[col].astype("string")
-                    else:
-                        df[col] = df[col].astype(col_type)
+                df = standardize_df_columns(df, column_types)
 
                 if not df.empty:
                     all_columns.update(df.columns)
@@ -267,22 +286,14 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
                     df = df.replace({np.nan: None})
 
-                    if asset := recipe.get("post_process"):
-                        post_processor = post_process[asset]
+                    if postproc := recipe.get("post_process"):
+                        post_processor = post_process[postproc]
                         if post_processor:
-                            print("post-processing", asset)
+                            print("post-processing", postproc)
                             df = post_processor(df)
-
-                    # for _, row in df.iterrows():
-                    #     print(row.to_dict())
 
                     # transform this chunk by table prefixes
                     json_data = transform_dataframe_to_json(df, recipe["prefixes"])
-
-                    # # Write JSON data to file
-                    # if not first_chunk:
-                    #     f.write(",")  # Separate JSON objects with a comma
-                    # first_chunk = False
 
                     # TODO: test efficiency vs memory (maybe just send it all)
                     for json_obj in json_data:
@@ -295,7 +306,7 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
 
     # return f"{docs_written} docs written to {out_file}"
     return {
-        "message": f"{docs_written} {asset} docs written",
+        "message": f"{docs_written} docs written",
         "out_file": out_file,
     }
 
@@ -349,6 +360,7 @@ async def selector(
     #     data = json.load(file)
     #     print(json.dumps(data, indent=2))
     print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+    return result  # sent to logger
 
 
 # Print the JSON data with indentation

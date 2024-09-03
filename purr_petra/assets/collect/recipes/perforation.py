@@ -84,5 +84,6 @@ recipe = {
         "p_remark": "memo_to_string",
         "p_chgdate": "excel_date",
     },
+    "post_process": "perforation_agg",
     "chunk_size": 5000,
 }

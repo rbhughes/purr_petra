@@ -23,12 +23,44 @@ def dst_agg(df):
     return df.groupby("w_wsn", as_index=False).agg(agg_dict)
 
 
+def formation_agg(df):
+    try:
+        agg_columns = [col for col in df.columns if col.startswith(("f_", "z_", "t_"))]
+        agg_dict = {col: preserve_empty_lists for col in agg_columns}
+
+        other_columns = [
+            col for col in df.columns if col not in agg_columns and col != "w_wsn"
+        ]
+        for col in other_columns:
+            agg_dict[col] = "first"
+    except Exception as e:
+        print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+        print(agg_dict)
+        print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+        print(e)
+
+    return df.groupby("w_wsn", as_index=False).agg(agg_dict)
+
+
 # 35137004570000
 def ip_agg(df):
     agg_columns = [col for col in df.columns if col.startswith("p_")]
     agg_dict = {
         col: preserve_empty_lists if col == "p_treat" else list for col in agg_columns
     }
+
+    other_columns = [
+        col for col in df.columns if col not in agg_columns and col != "w_wsn"
+    ]
+    for col in other_columns:
+        agg_dict[col] = "first"
+
+    return df.groupby("w_wsn", as_index=False).agg(agg_dict)
+
+
+def perforation_agg(df):
+    agg_columns = [col for col in df.columns if col.startswith("p_")]
+    agg_dict = {col: preserve_empty_lists for col in agg_columns}
 
     other_columns = [
         col for col in df.columns if col not in agg_columns and col != "w_wsn"
@@ -54,6 +86,8 @@ def production_agg(df):
 
 post_process = {
     "dst_agg": dst_agg,
+    "formation_agg": formation_agg,
     "ip_agg": ip_agg,
+    "perforation_agg": perforation_agg,
     "production_agg": production_agg,
 }

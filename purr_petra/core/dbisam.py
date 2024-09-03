@@ -46,11 +46,12 @@ def db_exec(conn: dict, sql: str) -> List[Dict[str, Any]] | Exception:
                 ]
 
     except pyodbc.ProgrammingError as pe:
-        logger.error(f"{pe}, context: {conn}")
-        if re.search(r"Table .* not found", str(pe)):
-            return pe
+        # Table <name> not found
+        # if re.search(r"Table .* not found", str(pe)):
+        raise pe
     except Exception as ex:
-        logger.error(f"{ex}, context: {conn}")
+        # Table <name> is not the correct version
+        # if re.search(r"not the correct version", str(ex)):
         raise ex
 
 

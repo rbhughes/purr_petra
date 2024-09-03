@@ -3,6 +3,7 @@
 from typing import Dict, List, Optional, Tuple
 from shapely.geometry import Polygon, MultiPolygon
 import numpy as np
+import pyodbc
 import alphashape  # mypy: ignore-missing-imports
 from purr_petra.core.dbisam import db_exec
 from purr_petra.core.logger import logger
@@ -139,12 +140,19 @@ def check_dbisam(repo_base) -> bool:
     Returns:
         bool: True if connection and query were successful, otherwise False
     """
-    res = db_exec(repo_base["conn"], "select count(*) as check from well")
-    if isinstance(res, Exception):
-        logger.warning(f"Looks like a Petra project but has invalid db?: {res}")
-        return False
-    else:
+
+    check_sql = "SELECT COUNT(*) AS check FROM well"
+
+    try:
+        res = db_exec(repo_base["conn"], check_sql)
+        if not isinstance(res, list):
+            logger.warning(f"Weirdly broken Petra project?: {res}")
+            return False
         return True
+    except Exception as e:
+        # logger.error(f"{e}, context: {repo_base["conn"]} {check_sql}")
+        logger.error(f"{e}, context: {repo_base}")
+        return False
 
 
 def well_counts(repo_base) -> dict:

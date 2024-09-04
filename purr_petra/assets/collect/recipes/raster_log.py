@@ -71,5 +71,6 @@ recipe = {
     "xforms": {
         "w_chgdate": "excel_date",
     },
+    "post_process": "raster_log_agg",
     "chunk_size": 5000,
 }

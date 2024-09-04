@@ -118,5 +118,6 @@ recipe = {
         "g_chgdate": "excel_date",
         "g_lashdr": "loglas_lashdr",
     },
+    "post_process": "vector_log_agg",
     "chunk_size": 1000,
 }

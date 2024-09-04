@@ -143,13 +143,19 @@ def transform_row_to_json(
     for column, value in row.items():
         if isinstance(value, np.ndarray):
             value = value.tolist()
+
+        ###
+        elif isinstance(value, list):
+            # Handle list of numpy arrays
+            value = [
+                item.tolist() if isinstance(item, np.ndarray) else item
+                for item in value
+            ]
+        ###
+
         elif not isinstance(value, list):
             if pd.isna(value):
                 value = None
-
-        # if not isinstance(value, np.ndarray) and not isinstance(value, list):
-        #     if pd.isna(value):
-        #         value = None
 
         for prefix, table_name in prefix_mapping.items():
             if column.startswith(prefix):

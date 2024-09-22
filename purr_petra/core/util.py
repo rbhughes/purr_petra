@@ -1,4 +1,4 @@
-"""Misc Utility methods"""
+"""Misc utility methods"""
 
 import asyncio
 import functools
@@ -7,7 +7,6 @@ import json
 import socket
 import time
 import importlib.util
-import pyodbc
 from datetime import datetime, date
 from functools import wraps, partial
 from pathlib import Path
@@ -85,18 +84,6 @@ def hostname():
         str: PC hostname to lowercase
     """
     return socket.gethostname().lower()
-
-
-# def hashify(value: Union[str, bytes]) -> str:
-#     if isinstance(value, str):
-#         value = value.lower().encode("utf-8")
-#     if isinstance(value, bytes):
-#         value = value.decode("utf-8")
-#     uuid_obj = uuid.uuid5(uuid.NAMESPACE_OID, value)
-#     return str(uuid_obj)
-
-
-########################
 
 
 class CustomJSONEncoder(json.JSONEncoder):
@@ -235,7 +222,8 @@ def debugger(func: Callable[..., Any]) -> Callable[..., Any]:
 
 
 def import_dict_from_file(file_path, dict_name):
-    """TODO: stuff"""
+    """A convenience function to extract a recipe Dict based on file path/name
+    (a bit like json.loads)"""
     spec = importlib.util.spec_from_file_location("module", file_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

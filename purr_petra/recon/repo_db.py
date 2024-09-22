@@ -3,7 +3,6 @@
 from typing import Dict, List, Optional, Tuple
 from shapely.geometry import Polygon, MultiPolygon
 import numpy as np
-import pyodbc
 import alphashape  # mypy: ignore-missing-imports
 from purr_petra.core.dbisam import db_exec
 from purr_petra.core.logger import logger
@@ -85,7 +84,6 @@ WELLS_WITH_PRODUCTION = (
     r"SELECT COUNT(*) AS tally from memory\temp;"
 )
 
-# TODO: confirm counts (there was variance in test proj 6669 vs 6672)
 # Select | Wells By Data Criteria | Logs | Raster Logs | Calibrated Rasters
 # (Find Wells With ANY Rasters)
 WELLS_WITH_RASTER_LOG = (
@@ -132,7 +130,8 @@ WELLS_WITH_ZONE = (
 
 
 def check_dbisam(repo_base) -> bool:
-    """A simple query to see if the database WELL table is accessible
+    """A simple query to see if the database WELL table is accessible. This will
+    cause a DBISAM error if the tables have not been updated to v4.
 
     Args:
         repo_base (dict): A stub repo dict.
@@ -149,7 +148,7 @@ def check_dbisam(repo_base) -> bool:
             logger.warning(f"Weirdly broken Petra project?: {res}")
             return False
         return True
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         # logger.error(f"{e}, context: {repo_base["conn"]} {check_sql}")
         logger.error(f"{e}, context: {repo_base}")
         return False

@@ -7,20 +7,22 @@ from typing import Any, Dict, List
 import pandas as pd
 import numpy as np
 import pyodbc
-import collections.abc
 
 from purr_petra.core.dbisam import db_exec
 from purr_petra.core.database import get_db
 from purr_petra.core.crud import get_repo_by_id, get_file_depot
 from purr_petra.assets.collect.xformer import formatters
 from purr_petra.core.util import async_wrap, import_dict_from_file
-from purr_petra.core.logger import logger
-
 from purr_petra.assets.collect.post_process import post_process
+from purr_petra.assets.collect.xformer import PURR_WHERE, transform_dataframe_to_json
+from purr_petra.assets.collect.sql_helper import (
+    make_where_clause,
+    create_selectors,
+)
+# from purr_petra.core.logger import logger
 
-from purr_petra.assets.collect.xformer import PURR_WHERE
 
-
+# because DBISAM isn't exactly popular...
 warnings.filterwarnings(
     "ignore", message="pandas only supports SQLAlchemy connectable.*"
 )
@@ -49,7 +51,6 @@ def chunk_ids(ids, chunk):
     id_groups = {}
 
     for item in ids:
-        # left = str(item).split("-")[0]
         left = str(item).split("-", maxsplit=1)[0]
         if left not in id_groups:
             id_groups[left] = []
@@ -73,6 +74,7 @@ def chunk_ids(ids, chunk):
 
 def fetch_id_list(conn, id_sql):
     """
+    Executes and asset recipe's identifier SQL and returns ids.
     :return: Results will be either be a single "keylist"
     [{keylist: ["1-62", "1-82", "2-83", "2-84"]}]
     or a list of key ids
@@ -88,13 +90,11 @@ def fetch_id_list(conn, id_sql):
 
     res = db_exec(conn, id_sql)
 
-    # print("$$$$$$$$$$")
-    # print(res)
-    # print("$$$$$$$$$$")
-
     ids = []
 
-    if "keylist" in res[0] and res[0]["keylist"] is not None:
+    if not res:
+        print("no ids found")
+    elif "keylist" in res[0] and res[0]["keylist"] is not None:
         ids = res[0]["keylist"].split(",")
     elif "key" in res[0] and res[0]["key"] is not None:
         ids = [k["key"] for k in res]
@@ -102,74 +102,6 @@ def fetch_id_list(conn, id_sql):
         print("key or keylist missing; cannot make id list")
 
     return [int_or_string(i) for i in ids]
-
-
-def make_where_clause(uwi_list: List[str]):
-    """Construct the UWI-centric part of a WHERE clause containing UWIs. The
-    WHERE clause will start: "WHERE 1=1 " to which we append:
-    "AND u_uwi LIKE '0123%' OR u_uwi LIKE '4567'"
-    Note that this isn't super-efficientt, but it's a decent compromise to keep
-    things simple.
-
-    Args:
-        uwi_list (List[str]): List of UWI strings with optional wildcard chars
-    """
-    # ASSUMES u.uwi WILL ALWAYS BE THE UWI FILTER
-    col = "u.uwi"
-    clause = "WHERE 1=1"
-    if uwi_list:
-        uwis = [f"{col} LIKE '{uwi}'" for uwi in uwi_list]
-        clause += " AND " + " OR ".join(uwis)
-
-    return clause
-
-
-def make_id_in_clauses(identifier_keys, ids):
-    clause = "WHERE 1=1 "
-    if len(identifier_keys) == 1 and str(ids[0]).replace("'", "").isdigit():
-        no_quotes = ",".join(str(i).replace("'", "") for i in ids)
-        clause += f"AND {identifier_keys[0]} IN ({no_quotes})"
-    else:
-        idc = " || '-' || ".join(f"CAST({i} AS VARCHAR(10))" for i in identifier_keys)
-        clause += f"AND {idc} IN ({','.join(ids)})"
-    return clause
-
-
-#######################################################################
-def transform_row_to_json(
-    row: pd.Series, prefix_mapping: Dict[str, str]
-) -> Dict[str, Any]:
-    result = {}
-    for column, value in row.items():
-        if isinstance(value, np.ndarray):
-            value = value.tolist()
-
-        ###
-        elif isinstance(value, list):
-            # Handle list of numpy arrays
-            value = [
-                item.tolist() if isinstance(item, np.ndarray) else item
-                for item in value
-            ]
-        ###
-
-        elif not isinstance(value, list):
-            if pd.isna(value):
-                value = None
-
-        for prefix, table_name in prefix_mapping.items():
-            if column.startswith(prefix):
-                if table_name not in result:
-                    result[table_name] = {}
-                result[table_name][column[len(prefix) :]] = value
-                break
-    return result
-
-
-def transform_dataframe_to_json(
-    df: pd.DataFrame, prefix_mapping: Dict[str, str]
-) -> List[Dict[str, Any]]:
-    return [transform_row_to_json(row, prefix_mapping) for _, row in df.iterrows()]
 
 
 #######################################################################
@@ -191,16 +123,10 @@ def map_col_type(sql_type):
 
 
 ###
-def create_selectors(chunked_ids, recipe):
-    selectors = []
-    for chunk in chunked_ids:
-        in_clause = make_id_in_clauses(recipe["identifier_keys"], chunk)
-        select_sql = recipe["selector"].replace(PURR_WHERE, in_clause)
-        selectors.append(select_sql)
-    return selectors
 
 
 def get_column_info(cursor):
+    """todo"""
     cursor_desc = cursor.description
     column_names = [col[0] for col in cursor_desc]
     column_types = {col[0]: map_col_type(col[1]) for col in cursor_desc}
@@ -208,6 +134,7 @@ def get_column_info(cursor):
 
 
 def standardize_df_columns(df: pd.DataFrame, column_types: Dict[str, str]):
+    """todo"""
     for col, col_type in column_types.items():
         if "int" in col_type:
             df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
@@ -225,6 +152,7 @@ def standardize_df_columns(df: pd.DataFrame, column_types: Dict[str, str]):
 
 #######################################################################
 def collect_and_assemble_docs(args: Dict[str, Any]):
+    """todo"""
     conn_params = args["conn"]
     recipe = args["recipe"]
     out_file = args["out_file"]
@@ -242,6 +170,10 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
     print("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
 
     ids = fetch_id_list(conn_params, id_sql)
+
+    # print("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
+    # print(ids)
+    # print("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
 
     chunked_ids = chunk_ids(ids, chunk_size)
 
@@ -310,7 +242,6 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
         f.seek(f.tell() - 1, 0)  # Remove the last comma
         f.write("]")
 
-    # return f"{docs_written} docs written to {out_file}"
     return {
         "message": f"{docs_written} docs written",
         "out_file": out_file,

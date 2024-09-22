@@ -11,6 +11,7 @@ from purr_petra.recon.epsg import epsg_codes
 from purr_petra.recon.repo_db import well_counts, get_polygon, check_dbisam
 from purr_petra.recon.repo_fs import network_repo_scan, dir_stats, repo_mod
 from purr_petra.core.schemas import Repo
+from purr_petra.core.logger import logger
 
 
 async def repo_recon(recon_root: str) -> List[Dict[str, Any]]:
@@ -32,7 +33,7 @@ async def repo_recon(recon_root: str) -> List[Dict[str, Any]]:
     repo_paths = await network_repo_scan(recon_root)
     repo_list = [create_repo_base(rp) for rp in repo_paths]
 
-    # make another pass to verify db
+    # make another pass to verify dbisam
     repo_list = [repo_base for repo_base in repo_list if check_dbisam(repo_base)]
 
     augment_funcs = [well_counts, get_polygon, epsg_codes, dir_stats, repo_mod]
@@ -46,6 +47,7 @@ async def repo_recon(recon_root: str) -> List[Dict[str, Any]]:
         for func in augment_funcs:
             # repo_base.update(await async_wrap(func)(repo_base))
             repo_base.update(func(repo_base))
+            logger.debug(f"{repo_base} applied function: {func}")
         return repo_base
 
     repos = await asyncio.gather(*[update_repo(repo) for repo in repo_list])

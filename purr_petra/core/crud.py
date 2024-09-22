@@ -71,6 +71,7 @@ def update_file_depot(db: Session, file_depot: str) -> Optional[str]:
         stmt = update(models.Settings).values(file_depot=file_depot)
     db.execute(stmt)
     db.commit()
+    logger.info(f"Set file_depot: {file_depot}")
     setting = db.query(models.Settings.file_depot).first()
     return setting.file_depot
 

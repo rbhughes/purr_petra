@@ -114,6 +114,8 @@ async def process_asset_collection(
 
 
 # ASSETS ######################################################################
+
+
 @router.post(
     "/asset/{repo_id}/{asset}",
     response_model=schemas.AssetCollectionResponse,

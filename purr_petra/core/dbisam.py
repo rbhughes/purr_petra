@@ -1,6 +1,5 @@
 """Convenience method for dealing with DBISAM via ODBC"""
 
-import re
 from pathlib import Path
 from typing import Any, Dict, List
 import pyodbc
@@ -27,6 +26,8 @@ def db_exec(conn: dict, sql: str) -> List[Dict[str, Any]] | Exception:
     Raises:
         - pyodbc.ProgrammingError: For cases where table(s) might not exist due
         to an unxepected schema.
+        - If the databases is older than DBISAM v4 (i.e Petra from about 2017),
+        the general Exception will be something like: "not the correct version"
     """
 
     try:
@@ -46,12 +47,10 @@ def db_exec(conn: dict, sql: str) -> List[Dict[str, Any]] | Exception:
                 ]
 
     except pyodbc.ProgrammingError as pe:
-        # Table <name> not found
-        # if re.search(r"Table .* not found", str(pe)):
+        logger.error(pe)
         raise pe
     except Exception as ex:
-        # Table <name> is not the correct version
-        # if re.search(r"not the correct version", str(ex)):
+        logger.error(ex)
         raise ex
 
 

@@ -37,6 +37,8 @@ def looks_like_petra_project(directory: str) -> bool:
 async def walk_dir_for_petra(path: str) -> List[str]:
     """A coroutine used to recursively crawl a directory for Petra-like paths
 
+    A healthy Petra project will contain an .ini file matching the directory
+    name, e.g. MYPROJECT\MYPROJECT.INI.
     Using os.walk was about ~20% faster than dir.rglob.
 
     Args:

@@ -1,6 +1,5 @@
-# from pandas import DataFrame as df
 import pandas as pd
-from typing import Any, List, Dict, Callable
+from typing import Any, List
 
 pd.set_option("display.max_colwidth", None)
 pd.set_option("display.max_rows", None)

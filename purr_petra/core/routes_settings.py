@@ -40,7 +40,7 @@ async def process_repo_recon(task_id: str, recon_root: str):
     "/file_depot",
     response_model=schemas.FileDepot,
     summary="Get the directory to store exported JSON files.",
-    description="Return the file_depot path.",
+    description="Get file_depot path.",
 )
 def get_file_depot(db: Session = Depends(get_db)):
     """Get the directory to store exported JSON files"""
@@ -53,7 +53,7 @@ def get_file_depot(db: Session = Depends(get_db)):
     response_model=schemas.Settings,
     summary="Set the directory to store exported JSON files.",
     description=(
-        "The file_depot should be a directory accessible to this API server. "
+        "The file_depot directory should be accessible to this PC."
         "Data extracted from project databases get written as JSON files here, "
         "each with a unique file name containing source repo and asset type."
     ),
@@ -76,13 +76,15 @@ def update_file_depot(file_depot: str, db: Session = Depends(get_db)):
 
 
 # REPOS #######################################################################
+
+
 @router.get(
     "/repos/",
     response_model=list[schemas.Repo],
     summary="Get list of Repos (full)",
     description=(
-        "Get a list of all Repos known to the API server. This includes the"
-        "potentially large polygon array defining spatial extents."
+        "Get a list of all Repos known to the API server. This includes all"
+        "metadata and a (potentially) large polygon defining spatial extents."
     ),
 )
 def read_repos(db: Session = Depends(get_db)):
@@ -95,7 +97,7 @@ def read_repos(db: Session = Depends(get_db)):
     "/repos/minimal",
     response_model=list[schemas.RepoMinimal],
     summary="Get list of Repos (minimal)",
-    description="Get a list of all Repos with only minimal metadata",
+    description="Get a list of all Repos with minimal metadata",
 )
 def get_repos(db: Session = Depends(get_db)):
     """Get list of Repos (minimal)"""
@@ -116,11 +118,16 @@ def get_repo_by_id(repo_id: str, db: Session = Depends(get_db)):
     """Get a specific Repo by ID"""
     repo = crud.get_repo_by_id(db, repo_id)
     if repo is None:
-        raise HTTPException(status_code=404, detail=f"Repo with id {repo_id} not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Repo with id {repo_id} not found",
+        )
     return repo
 
 
 # REPOS RECON #################################################################
+
+
 @router.post(
     "/repos/recon",
     response_model=schemas.RepoReconResponse,

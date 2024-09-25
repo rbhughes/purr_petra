@@ -1,9 +1,9 @@
 # purr_petra
 
 <div style="display: flex; height: 85px">
-    <img src="./docs/purrio.png" alt="drawing" height="85px" style="margin-right: 20px;"/>
-    <img src="./docs/snp.png" alt="drawing"/>
-    <p style="font-size:3.3em; margin-left:10px; margin-top:5px"> PETRA </p>
+    <img src="./docs/purrio.png" alt="purr.io logo" height="85px" style="margin-right: 20px;"/>
+    <img src="./docs/snp.png" alt="S&P Global" height="60px">
+    <p style="font-size:3.3em; margin-left:20px; margin-top:5px"> PETRA </p>
 </div>
 
 ---

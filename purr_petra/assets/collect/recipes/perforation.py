@@ -1,13 +1,13 @@
 """Petra perforation
 
-Petra's concept of perfs is less 'overwrought' than ggx. The sensible thing
-is to consider common dates to signify a single completion event. The
+Petra's concept of perfs is less 'overwrought' than geographix. The sensible
+thing is to consider common dates to signify a single completion event. The
 completion may even be indicated by the API number's last 4 digits:
 0001, 0002, 0003 signify recompletions
 maybe in 11th position like 0100 if it's a horizontal well"
 """
 
-from purr_petra.assets.collect.xformer import PURR_DELIM, PURR_NULL, PURR_WHERE
+from purr_petra.assets.collect.xformer import PURR_WHERE
 
 identifier_keys = ["w.wsn", "p.recid"]
 id_form = " || '-' || ".join([f"CAST({i} AS VARCHAR(10))" for i in identifier_keys])
@@ -85,5 +85,5 @@ recipe = {
         "p_chgdate": "excel_date",
     },
     "post_process": "perforation_agg",
-    "chunk_size": 5000,
+    "chunk_size": 1000,
 }

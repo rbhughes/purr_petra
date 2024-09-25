@@ -1,0 +1,768 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/purr/petra/file_depot": {
+      "get": {
+        "summary": "Get the directory to store exported JSON files.",
+        "description": "Get file_depot path.",
+        "operationId": "get_file_depot_purr_petra_file_depot_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDepot"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Set the directory to store exported JSON files.",
+        "description": "The file_depot directory should be accessible to this PC.Data extracted from project databases get written as JSON files here, each with a unique file name containing source repo and asset type.",
+        "operationId": "update_file_depot_purr_petra_file_depot_post",
+        "parameters": [
+          {
+            "name": "file_depot",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Depot"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/purr/petra/repos/": {
+      "get": {
+        "summary": "Get list of Repos (full)",
+        "description": "Get a list of all Repos known to the API server. This includes allmetadata and a (potentially) large polygon defining spatial extents.",
+        "operationId": "read_repos_purr_petra_repos__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Repo"
+                  },
+                  "type": "array",
+                  "title": "Response Read Repos Purr Petra Repos  Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/purr/petra/repos/minimal": {
+      "get": {
+        "summary": "Get list of Repos (minimal)",
+        "description": "Get a list of all Repos with minimal metadata",
+        "operationId": "get_repos_purr_petra_repos_minimal_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RepoMinimal"
+                  },
+                  "type": "array",
+                  "title": "Response Get Repos Purr Petra Repos Minimal Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/purr/petra/repos/{repo_id}": {
+      "get": {
+        "summary": "Get a specific Repo by ID",
+        "description": "Returns all metadata on a single Repo. Use GET /repos/minimal to see a list Repo IDs along with names and file paths.",
+        "operationId": "get_repo_by_id_purr_petra_repos__repo_id__get",
+        "parameters": [
+          {
+            "name": "repo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Repo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Repo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/purr/petra/repos/recon": {
+      "post": {
+        "summary": "Scan network path for Petra projects.",
+        "description": "Supply a top-level 'recon_root' path to scan for projects (a.k.a. Repos). Metadata will be collected for valid repos and stored in a local database. You can collect asset data from these 'known' repos later. The task_id is returned immediately; use it to check task status.",
+        "operationId": "run_repo_recon_purr_petra_repos_recon_post",
+        "parameters": [
+          {
+            "name": "recon_root",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Recon Root"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoReconResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/purr/petra/repos/recon/{task_id}": {
+      "get": {
+        "summary": "Check the status of a /repos/recon job using the task_id.",
+        "description": "A recon job may take several minutes, so use the task_id returned by the original POST to (periodically) check the job status. Possible status values are: pending, in_progress, completed or failed.",
+        "operationId": "get_repo_recon_status_purr_petra_repos_recon__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoReconResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/purr/petra/asset/{repo_id}/{asset}": {
+      "post": {
+        "summary": "Query a Repo for Asset data",
+        "description": "Specify a repo_id, asset (data type) and an optional uwi filter. Query results will be written to files stored in the 'file_depot' directory.",
+        "operationId": "asset_collection_purr_petra_asset__repo_id___asset__post",
+        "parameters": [
+          {
+            "name": "repo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "repo_id",
+              "title": "Repo Id"
+            },
+            "description": "repo_id"
+          },
+          {
+            "name": "asset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/AssetTypeEnum"
+                }
+              ],
+              "description": "asset type",
+              "title": "Asset"
+            },
+            "description": "asset type"
+          },
+          {
+            "name": "uwi_query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "description": "Enter full or partial uwi(s); use * or % as wildcard.Separate UWIs with spaces or commas. Leave blank to select all.",
+              "title": "Uwi Query"
+            },
+            "description": "Enter full or partial uwi(s); use * or % as wildcard.Separate UWIs with spaces or commas. Leave blank to select all."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetCollectionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/purr/petra/asset/status/{task_id}": {
+      "get": {
+        "summary": "Check status of a /asset/{repo_id}/{asset} job using the task_id.",
+        "description": "An assect collection job may take several minutes, so use the task_id returned by the original POST to (periodically) check the job status. Status values are: pending, in_progress, completed or failed. Query results will be written to the file_depot directory.",
+        "operationId": "get_asset_collect_status_purr_petra_asset_status__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetCollectionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssetCollectionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "task_status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "task_message": {
+            "type": "string",
+            "title": "Task Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "task_status",
+          "task_message"
+        ],
+        "title": "AssetCollectionResponse",
+        "description": "Pydantic model for AssetCollectionResponse"
+      },
+      "AssetTypeEnum": {
+        "type": "string",
+        "enum": [
+          "core",
+          "dst",
+          "formation",
+          "ip",
+          "perforation",
+          "production",
+          "raster_log",
+          "survey",
+          "vector_log",
+          "well",
+          "zone"
+        ],
+        "title": "AssetTypeEnum",
+        "description": "Enums for Asset types"
+      },
+      "FileDepot": {
+        "properties": {
+          "file_depot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Depot"
+          }
+        },
+        "type": "object",
+        "title": "FileDepot",
+        "description": "Pydantic model for FileDepot"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Repo": {
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "fs_path": {
+            "type": "string",
+            "title": "Fs Path"
+          },
+          "conn": {
+            "type": "object",
+            "title": "Conn"
+          },
+          "suite": {
+            "type": "string",
+            "title": "Suite"
+          },
+          "well_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Well Count"
+          },
+          "wells_with_core": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wells With Core"
+          },
+          "wells_with_dst": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wells With Dst"
+          },
+          "wells_with_formation": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wells With Formation"
+          },
+          "wells_with_ip": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wells With Ip"
+          },
+          "wells_with_perforation": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wells With Perforation"
+          },
+          "wells_with_production": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wells With Production"
+          },
+          "wells_with_raster_log": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wells With Raster Log"
+          },
+          "wells_with_survey": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wells With Survey"
+          },
+          "wells_with_vector_log": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wells With Vector Log"
+          },
+          "wells_with_zone": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wells With Zone"
+          },
+          "storage_epsg": {
+            "type": "integer",
+            "title": "Storage Epsg"
+          },
+          "storage_name": {
+            "type": "string",
+            "title": "Storage Name"
+          },
+          "display_epsg": {
+            "type": "integer",
+            "title": "Display Epsg"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files"
+          },
+          "directories": {
+            "type": "integer",
+            "title": "Directories"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          },
+          "repo_mod": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Repo Mod"
+          },
+          "polygon": {
+            "anyOf": [
+              {
+                "items": {
+                  "prefixItems": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "type": "array",
+                  "maxItems": 2,
+                  "minItems": 2
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Polygon"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active",
+          "name",
+          "fs_path",
+          "conn",
+          "suite",
+          "well_count",
+          "wells_with_core",
+          "wells_with_dst",
+          "wells_with_formation",
+          "wells_with_ip",
+          "wells_with_perforation",
+          "wells_with_production",
+          "wells_with_raster_log",
+          "wells_with_survey",
+          "wells_with_vector_log",
+          "wells_with_zone",
+          "storage_epsg",
+          "storage_name",
+          "display_epsg",
+          "display_name",
+          "files",
+          "directories",
+          "bytes",
+          "repo_mod",
+          "polygon",
+          "id"
+        ],
+        "title": "Repo",
+        "description": "Pydantic model for Repo"
+      },
+      "RepoMinimal": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "fs_path": {
+            "type": "string",
+            "title": "Fs Path"
+          },
+          "well_count": {
+            "type": "integer",
+            "title": "Well Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "fs_path",
+          "well_count"
+        ],
+        "title": "RepoMinimal",
+        "description": "Pydantic model for Minimal Repo"
+      },
+      "RepoReconResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "recon_root": {
+            "type": "string",
+            "title": "Recon Root"
+          },
+          "task_status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "recon_root",
+          "task_status"
+        ],
+        "title": "RepoReconResponse",
+        "description": "Pydantic model for RepoReconResponse"
+      },
+      "Settings": {
+        "properties": {
+          "file_depot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Depot"
+          }
+        },
+        "type": "object",
+        "title": "Settings",
+        "description": "Pydantic model for Settings"
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "in_progress",
+          "completed",
+          "failed"
+        ],
+        "title": "TaskStatus",
+        "description": "TaskStatus Enum"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

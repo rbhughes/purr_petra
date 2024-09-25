@@ -38,6 +38,23 @@ def unpack_int(buffer, start):
 ################################################################################
 
 
+def standardize_df_columns(df: pd.DataFrame, column_types: Dict[str, str]):
+    """todo"""
+    for col, col_type in column_types.items():
+        if "int" in col_type:
+            df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
+            df[col] = df[col].astype("Int64")
+        elif "str" in col_type:
+            df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
+            df[col] = df[col].astype("string")
+        else:
+            df[col] = df[col].astype(col_type)
+    return df
+
+
+################################################################################
+
+
 def safe_string(x: Optional[str]) -> Optional[str]:
     """remove control, non-printable chars, ensure UTF-8, strip whitespace."""
     if x is None:
@@ -292,9 +309,9 @@ formatters = {
     "loglas_lashdr": loglas_lashdr,
     "parse_congressional": parse_congressional,
     "array_of_int": array_of_int,
-    "array_of_float": array_of_int,
-    "array_of_string": array_of_int,
-    "array_of_excel_date": array_of_int,
+    "array_of_float": array_of_float,
+    "array_of_string": array_of_string,
+    "array_of_excel_date": array_of_excel_date,
     "fmtest_recovery": fmtest_recovery,
     "pdtest_treatment": pdtest_treatment,
     "parse_zztops": parse_zztops,

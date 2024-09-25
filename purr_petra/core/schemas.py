@@ -108,7 +108,6 @@ class RepoReconCreate(BaseModel):
     """Pydantic model for RepoReconCreate"""
 
     recon_root: str
-    # ggx_host: Optional[str] = None
 
 
 class RepoReconResponse(BaseModel):
@@ -116,7 +115,6 @@ class RepoReconResponse(BaseModel):
 
     id: str
     recon_root: str
-    # ggx_host: str
     task_status: TaskStatus
 
 

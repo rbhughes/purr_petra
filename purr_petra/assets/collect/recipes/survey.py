@@ -42,7 +42,7 @@ selector = f"""
         d.vs_1         AS d_vs_1,
         d.vs_2         AS d_vs_2,
         d.vs_3         AS d_vs_3,
-        d.data         AS d_data,
+        --d.data         AS d_data,
 
         f.name         AS f_survey_type,
 
@@ -94,7 +94,7 @@ recipe = {
         "w_chgdate": "excel_date",
         "d_adddate": "excel_date",
         "d_chgdate": "excel_date",
-        "d_data": "blob_to_hex",
+        # "d_data": "blob_to_hex",
         "v_wsn": "array_of_int",
         "v_md": "array_of_float",
         "v_tvd": "array_of_float",

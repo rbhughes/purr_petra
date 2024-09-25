@@ -14,12 +14,18 @@ from purr_petra.core.crud import get_repo_by_id, get_file_depot
 from purr_petra.assets.collect.xformer import formatters
 from purr_petra.core.util import async_wrap, import_dict_from_file
 from purr_petra.assets.collect.post_process import post_process
-from purr_petra.assets.collect.xformer import PURR_WHERE, transform_dataframe_to_json
+from purr_petra.assets.collect.xformer import (
+    PURR_WHERE,
+    transform_dataframe_to_json,
+    standardize_df_columns,
+)
 from purr_petra.assets.collect.sql_helper import (
+    get_column_info,
     make_where_clause,
     create_selectors,
+    chunk_ids,
 )
-# from purr_petra.core.logger import logger
+from purr_petra.core.logger import logger
 
 
 # because DBISAM isn't exactly popular...
@@ -27,49 +33,7 @@ warnings.filterwarnings(
     "ignore", message="pandas only supports SQLAlchemy connectable.*"
 )
 
-
-def chunk_ids(ids, chunk):
-    """
-    [621, 826, 831, 834, 835, 838, 846, 847, 848]
-    ...with chunk=4...
-    [[621, 826, 831, 834], [835, 838, 846, 847], [848]]
-
-    ["1-62", "1-82", "2-83", "2-83", "2-83", "2-83", "2-84", "3-84", "4-84"]
-    ...with chunk=4...
-    [
-        ['1-62', '1-82'],
-        ['2-83', '2-83', '2-83', '2-83', '2-84'],
-        ['3-84', '4-84']
-    ]
-    Note how the group of 2's is kept together, even if it exceeds chunk=4
-
-    :param ids: This is usually a list of wsn ints: [11, 22, 33, 44] but may
-        also be "compound" str : ['1-11', '1-22', '1-33', '2-22', '2-44'].
-    :param chunk: The preferred batch size to process in a single query
-    :return: List of id lists
-    """
-    id_groups = {}
-
-    for item in ids:
-        left = str(item).split("-", maxsplit=1)[0]
-        if left not in id_groups:
-            id_groups[left] = []
-        id_groups[left].append(item)
-
-    result = []
-    current_subarray = []
-
-    for group in id_groups.values():
-        if len(current_subarray) + len(group) <= chunk:
-            current_subarray.extend(group)
-        else:
-            result.append(current_subarray)
-            current_subarray = group[:]
-
-    if current_subarray:
-        result.append(current_subarray)
-
-    return result
+##############################################################################
 
 
 def fetch_id_list(conn, id_sql):
@@ -93,64 +57,17 @@ def fetch_id_list(conn, id_sql):
     ids = []
 
     if not res:
-        print("no ids found")
+        logger.info("no ids found")
     elif "keylist" in res[0] and res[0]["keylist"] is not None:
         ids = res[0]["keylist"].split(",")
     elif "key" in res[0] and res[0]["key"] is not None:
         ids = [k["key"] for k in res]
     else:
-        print("key or keylist missing; cannot make id list")
+        logger.info("key or keylist missing; cannot make id list")
 
     return [int_or_string(i) for i in ids]
 
 
-#######################################################################
-
-
-def map_col_type(sql_type):
-    """
-    Map SQL data types to pandas data types.
-    """
-    type_map = {
-        int: "int64",
-        str: "string",
-        float: "float64",
-        bool: "bool",
-        type(None): "object",
-        "datetime64[ns]": "datetime64[ns]",
-    }
-    return type_map.get(sql_type, "object")
-
-
-###
-
-
-def get_column_info(cursor):
-    """todo"""
-    cursor_desc = cursor.description
-    column_names = [col[0] for col in cursor_desc]
-    column_types = {col[0]: map_col_type(col[1]) for col in cursor_desc}
-    return column_names, column_types
-
-
-def standardize_df_columns(df: pd.DataFrame, column_types: Dict[str, str]):
-    """todo"""
-    for col, col_type in column_types.items():
-        if "int" in col_type:
-            df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
-            df[col] = df[col].astype("Int64")
-        elif "str" in col_type:
-            df[col] = df[col].apply(lambda x: None if pd.isna(x) else x)
-            df[col] = df[col].astype("string")
-        else:
-            df[col] = df[col].astype(col_type)
-    return df
-
-
-###
-
-
-#######################################################################
 def collect_and_assemble_docs(args: Dict[str, Any]):
     """todo"""
     conn_params = args["conn"]
@@ -158,43 +75,37 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
     out_file = args["out_file"]
     xforms = recipe["xforms"]
 
-    # control memory by the number of "ids" in the where clause of a selector
+    # control memory usage by the number of "ids" in the where clause
     chunk_size = recipe["chunk_size"] if "chunk_size" in recipe else 1000
 
     where = make_where_clause(args["uwi_list"])
 
     id_sql = recipe["identifier"].replace(PURR_WHERE, where)
 
-    print("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
-    print(id_sql)
-    print("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
+    logger.debug(id_sql)
 
     ids = fetch_id_list(conn_params, id_sql)
 
-    # print("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
-    # print(ids)
-    # print("iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
+    logger.debug(ids)
 
     chunked_ids = chunk_ids(ids, chunk_size)
 
     if len(chunked_ids) == 0:
-        return "no hits"
+        msg = "Query returned zero hits"
+        logger.info(msg)
+        return msg
 
     selectors = create_selectors(chunked_ids, recipe)
 
     all_columns = set()
 
-    ######
     docs_written = 0
-    ######
 
     with open(out_file, "w", encoding="utf-8") as f:
         f.write("[")  # Start of JSON array
 
         for q in selectors:
-            print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
-            print(q)
-            print("qqqqqqqqqqqqqqqqqqqqqqqqqqq")
+            logger.debug(q)
 
             # pylint: disable=c-extension-no-member
             with pyodbc.connect(**conn_params) as conn:
@@ -206,6 +117,9 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
                 df = pd.DataFrame(
                     [tuple(row) for row in cursor.fetchall()], columns=column_names
                 )
+
+                # useful for diagnostics:
+                # duplicates = df[df.duplicated(subset=["w_uwi"])]
 
                 df = standardize_df_columns(df, column_types)
 
@@ -227,13 +141,14 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
                     if postproc := recipe.get("post_process"):
                         post_processor = post_process[postproc]
                         if post_processor:
-                            print("post-processing", postproc)
+                            logger.info(f"post-processing: {postproc}")
                             df = post_processor(df)
 
                     # transform this chunk by table prefixes
                     json_data = transform_dataframe_to_json(df, recipe["prefixes"])
 
-                    # TODO: test efficiency vs memory (maybe just send it all)
+                    logger.info(f"assembled {len(json_data)} docs")
+
                     for json_obj in json_data:
                         json_str = json.dumps(json_obj, default=str)
                         f.write(json_str + ",")
@@ -242,22 +157,21 @@ def collect_and_assemble_docs(args: Dict[str, Any]):
         f.seek(f.tell() - 1, 0)  # Remove the last comma
         f.write("]")
 
-    return {
-        "message": f"{docs_written} docs written",
-        "out_file": out_file,
-    }
+    end_msg = f"json docs written: {docs_written}"
+    logger.info(end_msg)
+    return {"message": end_msg, "out_file": out_file}
 
 
 async def selector(
     repo_id: str, asset: str, export_file: str, uwi_list: List[str]
 ) -> str:
-    """Main entry point to collect data from a GeoGraphix project
+    """Main entry point to collect data from a Petra project
 
     Args:
-        repo_id (str): ID from a specific GeoGraphix project
-        asset (str): An asset (i.e. datatype) to query from a gxdb
+        repo_id (str): ID from a specific project
+        asset (str): An asset (i.e. datatype) to query from project database
         export_file (str): Export file name with timestamp
-        uwi_list (str): A SIMILAR TO clause based on UWI string(s).
+        uwi_list (str): List of UWI strings
 
     Returns:
         str: A summary of the selector job--probably from export_json()
@@ -290,20 +204,10 @@ async def selector(
     async_collect_and_assemble_docs = async_wrap(collect_and_assemble_docs)
     result = await async_collect_and_assemble_docs(collection_args)
 
-    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-    print(result)
-    print("-------------------------------------------------")
+    # print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
     # with open(result["out_file"], "r") as file:
     #     data = json.load(file)
     #     print(json.dumps(data, indent=2))
-    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-    return result  # sent to logger
+    # print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
 
-
-# Print the JSON data with indentation
-
-# if len(records) > 0:
-#     async_export_json = async_wrap(export_json)
-#     return await async_export_json(records, export_file)
-# else:
-#     return "Query returned no results"
+    return result

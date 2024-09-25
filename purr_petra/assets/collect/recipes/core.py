@@ -86,5 +86,5 @@ recipe = {
         "c_desc": "array_of_string",
         "c_remark": "array_of_string",
     },
-    "chunk_size": 5000,
+    "chunk_size": 1000,
 }

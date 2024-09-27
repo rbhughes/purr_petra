@@ -1,27 +1,20 @@
 # purr_petra
 
-
 | <img src="./docs/purrio.png" alt="purrio logo" height="100"/> | <img src="./docs/snp.png" alt="purrio logo" width="200"/>| **PETRA** |
 |:--:|:--:|:--:|
 
----
 
-<!-- | ![purr.io logo](./docs/purrio.png) | ![S&P Global](./docs/snp.png) | **PETRA** |
-|:--:|:--:|:--:|
+Use **purr_petra** to locate and query any Petra project* with minimal setup 
+via a simple Python API. It's the missing middleware
+[API](https://rbhughes.github.io/purr_petra/) for taming an unruly geoscience 
+data environment.
 
-![purr.io logo](./docs/purrio.png) 
-![S&P Global](./docs/snp.png)  -->
-
-
-Use **purr_petra** to locate and query any Petra project* with zero setup via a
-simple Python API. It's the missing
-middleware [API](https://rbhughes.github.io/purr_petra/) for taming an unruly
-geoscience data environment.
 
 * #### Dynamic discovery and query of projects (even lost, unshared)
 * #### Simple Python API
 * #### No license checkouts
 * #### Well-centric exports to JSON:
+
 
 ```
 - core
@@ -37,43 +30,98 @@ geoscience data environment.
 - zone
 ```
 
+
 * _Each [Petra](https://www.spglobal.com/commodityinsights/en/ci/products/petra-geological-analysis.html) "project" is a semi-structured collection
   of E&P assets that interoperate with its own
   [DBISAM](https://www.elevatesoft.com/products?category=dbisam)
   database. From an IT perspective, Petra is a distributed collection of
   user-managed databases "on the network" containing millions of assets._
 
-## Quickstart
-
-**PREREQUISITE**: You'll need a DBISAM v4 ODBC driver. A bare-bones, 64-bit only 
-install of v4.48 is provided here for evaluation, but you should probably get
-the real thing from [Elevate Softare](https://www.elevatesoft.com/sales).
 
 
-1. Launch cmd prompt (right-click Command Prompt | Run as administrator)
-2. cd to the `odbc` directory in this library
-3. run `python setup.py`
----
+## QUICKSTART
+
+1. `pip install purr_petra`
+2. launch console "as Administrator" and run `prep-purr-petra`
+3. `start-purr-petra`
+4. visit `http://localhost:8070/docs` for auto-generated docs
+
+
+## DETAILED INSTALL/CONFIG
 
 
 ### install
+
+Using Python >3.10...
+_(and it should go without saying, this is a Windows-only package)_
+
+(optional) Define a virtual environment (venv), then:
 
 `pip install purr_petra`
 or
 `poetry add purr_petra`
 
-### launch:
 
-`uvicorn purr_petra.main:app --workers 4`
+### prepare
+
+You'll need a DBISAM v4 ODBC driver. A bare-bones, 64-bit only 
+install of v4.48 is provided here for evaluation, but you should probably get
+the real thing from [Elevate Softare](https://www.elevatesoft.com/sales).
+
+Repo metadata collection uses the [DU](https://learn.microsoft.com/en-us/sysinternals/downloads/du) Disk Usage utility for performance. The following 
+script will register the DU utility and tacitly accept its terms of use.
+
+Register the driver and du using these steps:
+
+1. launch an admin console (right-click Command Prompt | Run as administrator)
+2. cd to the install location, activate your virtual environment
+3. `prep-purr-petra`
+4. close the admin console
+
+
+### configure
+
+You can optionally define environment variables to modify some API behaviors. If 
+the PC isn't running other services you probably don't have to define/change any 
+of these:
+
+| variable | default | description 
+|:--|:--|:--|
+| PURR_PETRA_PORT | 8070 | TCP port number used by the API
+| PURR_PETRA_HOST | 0.0.0.0 | the default "localhost"
+| PURR_PETRA_WORKERS | 4 | can increase if CPU supports it
+| PURR_LOG_LEVEL | INFO |  options: CRITICAL, ERROR, WARNING, INFO, DEBUG
+
+Some other files get written to your install location:
+* SQLite database: `purr_petra.sqlite`
+* log file: `purr_petra.log`
+
+
+### launch
+
+Launch the API via its preinstalled script
+1. cd to the install location (a non-admin console is fine)
+2. `start-purr-petra`
+
+The first time you launch the API, Windows Firewall may whine about Python.
+Enable "Private networks" and Allow Access:
+
+![firewall](./docs/firewall.png)
 
 **purr_petra** uses [FastAPI](https://fastapi.tiangolo.com "FastAPI").
-You can test-drive your local API at: `http://localhost:8000/docs` after install.
+You can test-drive your local API at either: 
 
-## Usage
+`http://localhost:8070/docs` 
+or
+`http://localhost:8070/doc` 
 
-#### 1. Do a POST `/purr/petra/repos/recon` with a network path and server hostname
 
-The path can be a top-level container of Petra projects or just a project itself.
+
+## USAGE
+
+#### 1. Do a POST `/purr/petra/repos/recon` with a network path and hostname
+
+The path can be a top-level container of projects or just a project itself.
 NOTE: _We use the term **repo** and **project** interchangeably_
 
 ![recon](./docs/recon.png)
@@ -89,7 +137,8 @@ curl -X 'POST' \
 
 _(Replace single quotes with double-quote for Windows)_
 
-This might take a few minutes, so you get a `202 Reponse` containing a task id and task_status:
+This might take a few minutes, so you get a `202 Reponse` containing a task id
+and task_status:
 
 ```
 {
@@ -133,8 +182,8 @@ pending export file.
 
 #### 4. Check asset export with a GET to /purr/petra/asset/{repo_id}/{asset}
 
-Like `repo/recon`, this returns a tast_status and task_message containing exported file
-info.
+Like `repo/recon`, this returns a tast_status and task_message containing
+exported file info.
 
 ```
 {
@@ -150,7 +199,9 @@ info.
 All asset data is exported as a "flattened" JSON representation of the original
 relational model. Here's a [survey](./docs/survey.json) example.
 
-## Future
+
+
+## FUTURE
 
 Let me know whatever you might want to see in a future release. Some ideas are:
 
@@ -161,7 +212,9 @@ Let me know whatever you might want to see in a future release. Some ideas are:
 * Auto-sync with your PPDM or OSDU store?
 * Standardize a multi-project interface with Spotfire
 
-## License
+
+
+## LICENSE
 
 ```
 MIT License

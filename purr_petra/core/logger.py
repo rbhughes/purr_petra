@@ -10,7 +10,8 @@ from loguru import logger as loguru_logger
 # INFO
 # DEBUG
 
-LOG_LEVEL = os.environ.get("PURR_LOG_LEVEL", "INFO")
+log_level = os.environ.get("PURR_LOG_LEVEL", "INFO")
+LOG_NAME = "purr_petra.log"
 
 
 def setup_logger():
@@ -24,14 +25,14 @@ def setup_logger():
     # output to console
     loguru_logger.add(
         sys.stdout,
-        level=LOG_LEVEL,
+        level=log_level,
         format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {name} | {message}",
     )
 
-    # outputs to file
+    # output to file
     loguru_logger.add(
-        "purr.log",
-        level=LOG_LEVEL,
+        LOG_NAME,
+        level=log_level,
         format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {name} | {message}",
         rotation="500 MB",
         compression="zip",

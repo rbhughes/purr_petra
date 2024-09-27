@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "purr-petra"
-version = "0.1.3"
+version = "0.1.5"
 description = "Python API to extract JSON data from S&P Global Petra projects"
 authors = ["R. Bryan Hughes <bryan@purr.io>"]
 readme = "README.md"
@@ -22,3 +22,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
 ignore_missing_imports = true
+
+[tool.poetry.scripts]
+prep-purr-petra = "purr_petra.main:prep"
+start-purr-petra = "purr_petra.main:start"

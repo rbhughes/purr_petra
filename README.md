@@ -1,10 +1,16 @@
 # purr_petra
 
 
-
-| ![purr.io logo](./docs/purrio.png) | ![S&P Global](./docs/snp.png) | **PETRA** |
+| <img src="./docs/purrio.png" alt="purrio logo" height="100"/> | <img src="./docs/snp.png" alt="purrio logo" width="200"/>| **PETRA** |
 |:--:|:--:|:--:|
 
+---
+
+<!-- | ![purr.io logo](./docs/purrio.png) | ![S&P Global](./docs/snp.png) | **PETRA** |
+|:--:|:--:|:--:|
+
+![purr.io logo](./docs/purrio.png) 
+![S&P Global](./docs/snp.png)  -->
 
 
 Use **purr_petra** to locate and query any Petra project* with zero setup via a
@@ -43,9 +49,6 @@ geoscience data environment.
 install of v4.48 is provided here for evaluation, but you should probably get
 the real thing from [Elevate Softare](https://www.elevatesoft.com/sales).
 
-* YOU MUST RUN `setup.py` AS LOCAL ADMIN to write to the registry!
-* YOU MUST HAVE PYTHON IN THE PATH SO THAT CMD RECOGNIZES IT
-* There are no external dependencies, no need to set venv for these steps:
 
 1. Launch cmd prompt (right-click Command Prompt | Run as administrator)
 2. cd to the `odbc` directory in this library

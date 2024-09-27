@@ -1,6 +1,7 @@
 """Shared Logger"""
 
 import sys
+import os
 from loguru import logger as loguru_logger
 
 # CRITICAL
@@ -9,7 +10,7 @@ from loguru import logger as loguru_logger
 # INFO
 # DEBUG
 
-LOG_LEVEL = "INFO"
+LOG_LEVEL = os.environ.get("PURR_LOG_LEVEL", "INFO")
 
 
 def setup_logger():
